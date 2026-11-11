@@ -1,0 +1,377 @@
+erDiagram
+    USERS ||--|| USER_PROFILES : "configures"
+    USERS ||--o{ CONSENTS : "grants"
+    USERS |o--o{ AUDIT_EVENTS : "triggers"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ FEEDBACKS : "submits"
+
+    USERS ||--o{ FINANCIAL_ACCOUNTS : "owns"
+    FINANCIAL_ACCOUNTS ||--o{ ACCOUNT_BALANCE_SNAPSHOTS : "anchored_by"
+
+    USERS ||--o{ DATA_SOURCES : "authorizes"
+    FINANCIAL_ACCOUNTS |o--o{ DATA_SOURCES : "maps_default_account"
+    DATA_SOURCES ||--o{ IMPORT_BATCHES : "produces"
+    IMPORT_BATCHES ||--o{ RAW_MESSAGES : "contains"
+    RAW_MESSAGES |o--o{ RAW_MESSAGES : "duplicate_candidate_of"
+
+    USERS |o--o{ CATEGORIES : "creates_custom"
+    CATEGORIES |o--o{ CATEGORIES : "parent_of"
+
+    USERS ||--o{ TRANSACTIONS : "owns"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSACTIONS : "ledger_account_for"
+    CATEGORIES ||--o{ TRANSACTIONS : "classifies"
+    IMPORT_BATCHES |o--o{ TRANSACTIONS : "ingested_via"
+    RAW_MESSAGES |o--o{ TRANSACTIONS : "normalized_from"
+
+    TRANSACTIONS |o--o{ TRANSACTIONS : "possible_duplicate_of"
+    TRANSACTIONS |o--o{ TRANSACTIONS : "refunds_or_reverses"
+    TRANSACTIONS ||--o{ CATEGORIZATION_LOGS : "logs_decision_for"
+    CATEGORIES ||--o{ CATEGORIZATION_LOGS : "assigned_category"
+    CATEGORIES |o--o{ CATEGORIZATION_LOGS : "overrides_previous"
+
+    USERS ||--o{ TRANSFERS : "executes"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSFERS : "source_account"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSFERS : "destination_account"
+    TRANSACTIONS |o--o| TRANSFERS : "debit_leg"
+    TRANSACTIONS |o--o| TRANSFERS : "credit_leg"
+
+    USERS ||--o{ BUDGETS : "defines"
+    CATEGORIES |o--o{ BUDGETS : "limits_spending_for"
+
+    USERS ||--o{ FINANCIAL_GOALS : "targets"
+    FINANCIAL_ACCOUNTS |o--o{ FINANCIAL_GOALS : "dedicated_savings_account"
+    FINANCIAL_GOALS ||--o{ GOAL_CONTRIBUTIONS : "accumulates"
+    FINANCIAL_ACCOUNTS |o--o{ GOAL_CONTRIBUTIONS : "funded_from"
+    TRANSACTIONS |o--o{ GOAL_CONTRIBUTIONS : "linked_transaction"
+
+    USERS ||--o{ RECURRING_COMMITMENTS : "subscribes_to"
+    CATEGORIES ||--o{ RECURRING_COMMITMENTS : "categorizes_bill"
+    FINANCIAL_ACCOUNTS |o--o{ RECURRING_COMMITMENTS : "debited_from"
+
+    USERS ||--o{ PREDICTIONS : "receives_forecast"
+    CATEGORIES |o--o{ PREDICTIONS : "forecasted_category"
+
+    USERS ||--o{ ADVISORY_REQUESTS : "inquires"
+    CATEGORIES |o--o{ ADVISORY_REQUESTS : "item_category"
+    ADVISORY_REQUESTS ||--o| ADVISORY_DECISIONS : "evaluated_by"
+
+
+    USERS {
+        uuid user_id PK
+        varchar email UK
+        varchar password_hash
+        user_role role
+        user_status status
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    USER_PROFILES {
+        uuid profile_id PK
+        uuid user_id FK
+        varchar base_currency
+        numeric monthly_stated_income
+        numeric savings_target_percentage
+        varchar risk_tolerance
+        jsonb notification_preferences
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONSENTS {
+        uuid consent_id PK
+        uuid user_id FK
+        varchar purpose
+        varchar scope
+        consent_status status
+        varchar consent_version
+        varchar ip_address
+        text user_agent
+        timestamptz granted_at
+        timestamptz expires_at
+        timestamptz withdrawn_at
+        timestamptz created_at
+    }
+
+    FINANCIAL_ACCOUNTS {
+        uuid account_id PK
+        uuid user_id FK
+        varchar account_name
+        account_type account_type
+        varchar institution_name
+        varchar account_mask
+        varchar currency
+        numeric cached_balance
+        timestamptz last_reconciled_at
+        account_status status
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    ACCOUNT_BALANCE_SNAPSHOTS {
+        uuid snapshot_id PK
+        uuid account_id FK
+        uuid user_id FK
+        numeric balance_amount
+        timestamptz as_of_timestamp
+        snapshot_source snapshot_source
+        varchar statement_reference
+        boolean is_reconciled
+        timestamptz created_at
+    }
+
+    DATA_SOURCES {
+        uuid source_id PK
+        uuid user_id FK
+        uuid account_id FK
+        source_type source_type
+        varchar provider_name
+        boolean is_active
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    IMPORT_BATCHES {
+        uuid batch_id PK
+        uuid source_id FK
+        uuid user_id FK
+        varchar batch_reference
+        varchar file_hash
+        batch_status status
+        int total_records
+        int parsed_records
+        int duplicate_records
+        int failed_records
+        jsonb error_summary
+        timestamptz started_at
+        timestamptz completed_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    RAW_MESSAGES {
+        uuid message_id PK
+        uuid batch_id FK
+        uuid source_id FK
+        uuid user_id FK
+        varchar external_message_id UK
+        varchar content_hash
+        text sanitized_preview
+        raw_message_status processing_status
+        uuid duplicate_of_id FK
+        varchar parser_version
+        text rejection_reason
+        timestamptz received_at
+        timestamptz created_at
+    }
+
+    CATEGORIES {
+        uuid category_id PK
+        uuid user_id FK
+        uuid parent_id FK
+        varchar name
+        category_type category_type
+        varchar icon
+        varchar color_hex
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    TRANSACTIONS {
+        uuid transaction_id PK
+        uuid user_id FK
+        uuid account_id FK
+        uuid batch_id FK
+        uuid raw_message_id FK
+        uuid category_id FK
+        numeric amount
+        varchar currency
+        transaction_type type
+        transaction_status status
+        duplicate_status duplicate_status
+        uuid possible_duplicate_of_id FK
+        varchar merchant_name
+        varchar clean_merchant_name
+        text description
+        timestamptz transaction_at
+        date posting_date
+        varchar reference_hash
+        varchar external_reference UK
+        uuid original_transaction_id FK
+        boolean is_recurring
+        boolean is_user_verified
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    TRANSFERS {
+        uuid transfer_id PK
+        uuid user_id FK
+        uuid source_account_id FK
+        uuid destination_account_id FK
+        uuid source_transaction_id FK
+        uuid destination_transaction_id FK
+        numeric amount
+        varchar currency
+        transfer_status status
+        timestamptz transfer_date
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CATEGORIZATION_LOGS {
+        uuid log_id PK
+        uuid transaction_id FK
+        uuid category_id FK
+        categorization_method method
+        numeric confidence_score
+        varchar model_version
+        boolean user_overridden
+        uuid previous_category_id FK
+        timestamptz created_at
+    }
+
+    BUDGETS {
+        uuid budget_id PK
+        uuid user_id FK
+        uuid category_id FK
+        varchar name
+        budget_period_type period_type
+        date period_start
+        date period_end
+        numeric limit_amount
+        int warning_threshold_pct
+        budget_status status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    FINANCIAL_GOALS {
+        uuid goal_id PK
+        uuid user_id FK
+        uuid account_id FK
+        varchar name
+        numeric target_amount
+        numeric cached_current_amount
+        date target_date
+        numeric monthly_target_contribution
+        int priority
+        goal_status status
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    GOAL_CONTRIBUTIONS {
+        uuid contribution_id PK
+        uuid goal_id FK
+        uuid user_id FK
+        uuid account_id FK
+        uuid transaction_id FK
+        numeric amount
+        contribution_type contribution_type
+        date contribution_date
+        text notes
+        timestamptz created_at
+    }
+
+    RECURRING_COMMITMENTS {
+        uuid commitment_id PK
+        uuid user_id FK
+        uuid category_id FK
+        uuid account_id FK
+        varchar merchant_name
+        numeric expected_amount
+        commitment_frequency frequency
+        date next_expected_date
+        numeric detection_confidence
+        boolean is_user_confirmed
+        commitment_status status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    PREDICTIONS {
+        uuid prediction_id PK
+        uuid user_id FK
+        uuid category_id FK
+        forecast_type forecast_type
+        date target_period_start
+        date target_period_end
+        numeric predicted_amount
+        numeric confidence_score
+        numeric risk_probability
+        varchar model_version
+        date input_window_start
+        date input_window_end
+        jsonb metadata
+        timestamptz created_at
+    }
+
+    ADVISORY_REQUESTS {
+        uuid request_id PK
+        uuid user_id FK
+        uuid category_id FK
+        numeric purchase_amount
+        varchar currency
+        varchar item_description
+        text user_notes
+        timestamptz created_at
+    }
+
+    ADVISORY_DECISIONS {
+        uuid request_id PK,FK
+        advisory_outcome decision_outcome
+        numeric affordability_score
+        jsonb deterministic_factors
+        jsonb budget_impact_summary
+        jsonb goal_impact_summary
+        text llm_explanation
+        text disclaimer
+        varchar rule_engine_version
+        varchar llm_model_version
+        timestamptz created_at
+    }
+
+    FEEDBACKS {
+        uuid feedback_id PK
+        uuid user_id FK
+        feedback_target target_type
+        uuid target_id
+        int rating
+        text feedback_text
+        jsonb correction_data
+        timestamptz created_at
+    }
+
+    NOTIFICATIONS {
+        uuid notification_id PK
+        uuid user_id FK
+        notification_type notification_type
+        varchar title
+        text message
+        jsonb payload
+        boolean is_read
+        timestamptz read_at
+        timestamptz created_at
+    }
+
+    AUDIT_EVENTS {
+        uuid event_id PK
+        uuid actor_id
+        varchar actor_role
+        varchar action
+        varchar entity_type
+        varchar entity_id
+        varchar ip_address
+        text user_agent
+        jsonb metadata
+        timestamptz created_at
+    }

@@ -1,0 +1,760 @@
+// ============================================================================
+// AI-Powered Personal Finance & Smart Expenditure Advisor
+// Complete Production-Grade Prisma Schema (v1.1 - Hardened Edition)
+// Compatible with PostgreSQL 14+, Express.js & Node.js (JavaScript runtime)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  END_USER
+  PROJECT_ADMIN
+  AUDITOR
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+
+  @@map("user_status")
+}
+
+enum ConsentStatus {
+  GRANTED
+  WITHDRAWN
+  EXPIRED
+
+  @@map("consent_status")
+}
+
+enum AccountType {
+  SAVINGS
+  CURRENT
+  CREDIT_CARD
+  WALLET
+  CASH
+  INVESTMENT
+
+  @@map("account_type")
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+
+  @@map("account_status")
+}
+
+enum SnapshotSource {
+  OPENING_BALANCE
+  STATEMENT_IMPORT
+  MANUAL_RECONCILIATION
+
+  @@map("snapshot_source")
+}
+
+enum SourceType {
+  ANDROID_SMS
+  CSV_STATEMENT
+  MANUAL_INPUT
+
+  @@map("source_type")
+}
+
+enum BatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  PARTIALLY_FAILED
+  FAILED
+
+  @@map("batch_status")
+}
+
+enum RawMessageStatus {
+  PENDING
+  PARSED
+  POTENTIAL_DUPLICATE
+  FAILED
+  IGNORED
+
+  @@map("raw_message_status")
+}
+
+enum CategoryType {
+  EXPENSE
+  INCOME
+  TRANSFER
+  INVESTMENT
+
+  @@map("category_type")
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+  TRANSFER
+  REFUND
+  REVERSAL
+  FEE
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  POSTED
+  PENDING
+  FLAGGED_FOR_REVIEW
+  RECONCILED
+  EXCLUDED
+
+  @@map("transaction_status")
+}
+
+enum DuplicateStatus {
+  NOT_DUPLICATE
+  POTENTIAL_DUPLICATE
+  CONFIRMED_DUPLICATE
+
+  @@map("duplicate_status")
+}
+
+enum TransferStatus {
+  SETTLED
+  PENDING
+  CANCELLED
+
+  @@map("transfer_status")
+}
+
+enum CategorizationMethod {
+  RULE_BASED
+  ML_MODEL
+  USER_MANUAL
+  FALLBACK_DEFAULT
+
+  @@map("categorization_method")
+}
+
+enum BudgetPeriodType {
+  MONTHLY
+  WEEKLY
+  CUSTOM
+
+  @@map("budget_period_type")
+}
+
+enum BudgetStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+
+  @@map("budget_status")
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  ACHIEVED
+  PAUSED
+  CANCELLED
+
+  @@map("goal_status")
+}
+
+enum ContributionType {
+  ALLOCATION
+  TRANSACTION_LINKED
+  INTEREST
+  WITHDRAWAL
+
+  @@map("contribution_type")
+}
+
+enum CommitmentFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+
+  @@map("commitment_frequency")
+}
+
+enum CommitmentStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+
+  @@map("commitment_status")
+}
+
+enum ForecastType {
+  TOTAL_EXPENDITURE
+  CATEGORY_EXPENDITURE
+  BUDGET_DEVIATION_RISK
+
+  @@map("forecast_type")
+}
+
+enum AdvisoryOutcome {
+  BUY
+  CONSIDER_WAITING
+  AVOID_FOR_NOW
+
+  @@map("advisory_outcome")
+}
+
+enum FeedbackTarget {
+  CATEGORIZATION
+  ADVISORY
+  FORECAST
+
+  @@map("feedback_target")
+}
+
+enum NotificationType {
+  BUDGET_WARNING
+  BUDGET_BREACH
+  FORECAST_ALERT
+  PARSING_FAILURE
+  RECURRING_DUE
+  ADVISORY_FOLLOWUP
+  DUPLICATE_REVIEW_NEEDED
+  SYSTEM
+
+  @@map("notification_type")
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+model User {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @map("user_id") @db.Uuid
+  email        String     @unique @map("email") @db.VarChar(255)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  role         UserRole   @default(END_USER) @map("role")
+  status       UserStatus @default(ACTIVE) @map("status")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)
+
+  // Relations
+  profile              UserProfile?
+  consents             Consent[]
+  financialAccounts    FinancialAccount[]
+  dataSources          DataSource[]
+  importBatches        ImportBatch[]
+  rawMessages          RawMessage[]
+  customCategories     Category[]
+  transactions         Transaction[]
+  transfers            Transfer[]
+  budgets              Budget[]
+  financialGoals       FinancialGoal[]
+  recurringCommitments RecurringCommitment[]
+  predictions          Prediction[]
+  advisoryRequests     AdvisoryRequest[]
+  feedbacks            Feedback[]
+  notifications        Notification[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @map("profile_id") @db.Uuid
+  userId                  String   @unique @map("user_id") @db.Uuid
+  baseCurrency            String   @default("INR") @map("base_currency") @db.VarChar(3)
+  monthlyStatedIncome     Decimal  @default(0.00) @map("monthly_stated_income") @db.Decimal(14, 2)
+  savingsTargetPercentage Decimal  @default(20.00) @map("savings_target_percentage") @db.Decimal(5, 2)
+  riskTolerance           String   @default("MODERATE") @map("risk_tolerance") @db.VarChar(50)
+  notificationPreferences Json     @default("{\"budget_threshold_pct\": 80, \"forecast_warnings\": true, \"email_alerts\": false, \"in_app_alerts\": true}") @map("notification_preferences")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model Consent {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @map("consent_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  purpose        String        @map("purpose") @db.VarChar(100)
+  scope          String        @map("scope") @db.VarChar(255)
+  status         ConsentStatus @default(GRANTED) @map("status")
+  consentVersion String        @default("1.0") @map("consent_version") @db.VarChar(20)
+  ipAddress      String?       @map("ip_address") @db.VarChar(45)
+  userAgent      String?       @map("user_agent") @db.Text
+  grantedAt      DateTime      @default(now()) @map("granted_at") @db.Timestamptz(6)
+  expiresAt      DateTime?     @map("expires_at") @db.Timestamptz(6)
+  withdrawnAt    DateTime?     @map("withdrawn_at") @db.Timestamptz(6)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status], name: "idx_consents_user_status")
+  @@index([userId, purpose, status], name: "idx_consents_user_purpose")
+  @@map("consents")
+}
+
+model FinancialAccount {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @map("account_id") @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  accountName      String        @map("account_name") @db.VarChar(100)
+  accountType      AccountType   @map("account_type")
+  institutionName  String        @map("institution_name") @db.VarChar(100)
+  accountMask      String?       @map("account_mask") @db.VarChar(10)
+  currency         String        @default("INR") @map("currency") @db.VarChar(3)
+  cachedBalance    Decimal       @default(0.00) @map("cached_balance") @db.Decimal(14, 2)
+  lastReconciledAt DateTime?     @map("last_reconciled_at") @db.Timestamptz(6)
+  status           AccountStatus @default(ACTIVE) @map("status")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceSnapshots     AccountBalanceSnapshot[]
+  dataSources          DataSource[]
+  transactions         Transaction[]
+  transfersSource      Transfer[]               @relation("TransferSourceAccount")
+  transfersDestination Transfer[]               @relation("TransferDestinationAccount")
+  financialGoals       FinancialGoal[]
+  goalContributions    GoalContribution[]
+  recurringCommitments RecurringCommitment[]
+
+  @@unique([userId, id], name: "uq_financial_accounts_user_account")
+  @@index([userId, status], name: "idx_financial_accounts_user")
+  @@map("financial_accounts")
+}
+
+model AccountBalanceSnapshot {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @map("snapshot_id") @db.Uuid
+  accountId          String         @map("account_id") @db.Uuid
+  userId             String         @map("user_id") @db.Uuid
+  balanceAmount      Decimal        @map("balance_amount") @db.Decimal(14, 2)
+  asOfTimestamp      DateTime       @map("as_of_timestamp") @db.Timestamptz(6)
+  snapshotSource     SnapshotSource @default(STATEMENT_IMPORT) @map("snapshot_source")
+  statementReference String?        @map("statement_reference") @db.VarChar(100)
+  isReconciled       Boolean        @default(true) @map("is_reconciled")
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  account FinancialAccount @relation(fields: [userId, accountId], references: [userId, id], onDelete: Cascade)
+
+  @@index([accountId, asOfTimestamp], name: "idx_balance_snapshots_account")
+  @@map("account_balance_snapshots")
+}
+
+model DataSource {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @map("source_id") @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  accountId    String?    @map("account_id") @db.Uuid
+  sourceType   SourceType @map("source_type")
+  providerName String     @map("provider_name") @db.VarChar(100)
+  isActive     Boolean    @default(true) @map("is_active")
+  metadata     Json       @default("{}") @map("metadata")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account       FinancialAccount? @relation(fields: [userId, accountId], references: [userId, id], onDelete: SetNull)
+  importBatches ImportBatch[]
+  rawMessages   RawMessage[]
+
+  @@unique([userId, id], name: "uq_data_sources_user_source")
+  @@index([userId, isActive], name: "idx_data_sources_user")
+  @@map("data_sources")
+}
+
+model ImportBatch {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @map("batch_id") @db.Uuid
+  sourceId         String      @map("source_id") @db.Uuid
+  userId           String      @map("user_id") @db.Uuid
+  batchReference   String?     @map("batch_reference") @db.VarChar(100)
+  fileHash         String?     @map("file_hash") @db.VarChar(64)
+  status           BatchStatus @default(PENDING) @map("status")
+  totalRecords     Int         @default(0) @map("total_records")
+  parsedRecords    Int         @default(0) @map("parsed_records")
+  duplicateRecords Int         @default(0) @map("duplicate_records")
+  failedRecords    Int         @default(0) @map("failed_records")
+  errorSummary     Json        @default("[]") @map("error_summary")
+  startedAt        DateTime    @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?   @map("completed_at") @db.Timestamptz(6)
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  source       DataSource    @relation(fields: [userId, sourceId], references: [userId, id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rawMessages  RawMessage[]
+  transactions Transaction[]
+
+  @@unique([userId, id], name: "uq_import_batches_user_batch")
+  @@index([userId, status], name: "idx_import_batches_user")
+  @@map("import_batches")
+}
+
+model RawMessage {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @map("message_id") @db.Uuid
+  batchId           String           @map("batch_id") @db.Uuid
+  sourceId          String           @map("source_id") @db.Uuid
+  userId            String           @map("user_id") @db.Uuid
+  externalMessageId String?          @map("external_message_id") @db.VarChar(100)
+  contentHash       String           @map("content_hash") @db.VarChar(64)
+  sanitizedPreview  String?          @map("sanitized_preview") @db.Text
+  processingStatus  RawMessageStatus @default(PENDING) @map("processing_status")
+  duplicateOfId     String?          @map("duplicate_of_id") @db.Uuid
+  parserVersion     String           @default("v1.0") @map("parser_version") @db.VarChar(50)
+  rejectionReason   String?          @map("rejection_reason") @db.Text
+  receivedAt        DateTime         @default(now()) @map("received_at") @db.Timestamptz(6)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  batch        ImportBatch   @relation(fields: [userId, batchId], references: [userId, id], onDelete: Cascade)
+  source       DataSource    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duplicateOf  RawMessage?   @relation("RawMessageDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates   RawMessage[]  @relation("RawMessageDuplicates")
+  transactions Transaction[]
+
+  @@unique([sourceId, externalMessageId], name: "uq_raw_messages_provider_id")
+  @@index([userId, contentHash], name: "idx_raw_messages_content_hash")
+  @@index([processingStatus], name: "idx_raw_messages_status")
+  @@index([userId, receivedAt], name: "idx_raw_messages_user_received")
+  @@map("raw_messages")
+}
+
+model Category {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @map("category_id") @db.Uuid
+  userId       String?      @map("user_id") @db.Uuid
+  parentId     String?      @map("parent_id") @db.Uuid
+  name         String       @map("name") @db.VarChar(50)
+  categoryType CategoryType @default(EXPENSE) @map("category_type")
+  icon         String?      @map("icon") @db.VarChar(50)
+  colorHex     String?      @map("color_hex") @db.VarChar(7)
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                 User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent               Category?             @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  subcategories        Category[]            @relation("CategoryHierarchy")
+  transactions         Transaction[]
+  categorizationLogs   CategorizationLog[]   @relation("PrimaryCategory")
+  previousCatLogs      CategorizationLog[]   @relation("PreviousCategory")
+  budgets              Budget[]
+  recurringCommitments RecurringCommitment[]
+  predictions          Prediction[]
+  advisoryRequests     AdvisoryRequest[]
+
+  @@index([parentId], name: "idx_categories_parent")
+  @@map("categories")
+}
+
+model Transaction {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @map("transaction_id") @db.Uuid
+  userId                String            @map("user_id") @db.Uuid
+  accountId             String            @map("account_id") @db.Uuid
+  batchId               String?           @map("batch_id") @db.Uuid
+  rawMessageId          String?           @map("raw_message_id") @db.Uuid
+  categoryId            String            @map("category_id") @db.Uuid
+  amount                Decimal           @map("amount") @db.Decimal(14, 2)
+  currency              String            @default("INR") @map("currency") @db.VarChar(3)
+  type                  TransactionType   @map("type")
+  status                TransactionStatus @default(POSTED) @map("status")
+  duplicateStatus       DuplicateStatus   @default(NOT_DUPLICATE) @map("duplicate_status")
+  possibleDuplicateOfId String?           @map("possible_duplicate_of_id") @db.Uuid
+  merchantName          String            @map("merchant_name") @db.VarChar(150)
+  cleanMerchantName     String            @map("clean_merchant_name") @db.VarChar(150)
+  description           String?           @map("description") @db.Text
+  transactionAt         DateTime          @map("transaction_at") @db.Timestamptz(6)
+  postingDate           DateTime          @map("posting_date") @db.Date
+  referenceHash         String            @map("reference_hash") @db.VarChar(64)
+  externalReference     String?           @map("external_reference") @db.VarChar(100)
+  originalTransactionId String?           @map("original_transaction_id") @db.Uuid
+  isRecurring           Boolean           @default(false) @map("is_recurring")
+  isUserVerified        Boolean           @default(false) @map("is_user_verified")
+  metadata              Json              @default("{}") @map("metadata")
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt             DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              FinancialAccount      @relation(fields: [userId, accountId], references: [userId, id], onDelete: Restrict)
+  batch                ImportBatch?          @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  rawMessage           RawMessage?           @relation(fields: [rawMessageId], references: [id], onDelete: SetNull)
+  category             Category              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  originalTransaction  Transaction?          @relation("RefundReversal", fields: [originalTransactionId], references: [id], onDelete: SetNull)
+  refundedReversals    Transaction[]         @relation("RefundReversal")
+  possibleDuplicateOf  Transaction?          @relation("PossibleDuplicates", fields: [possibleDuplicateOfId], references: [id], onDelete: SetNull)
+  duplicateCandidates  Transaction[]         @relation("PossibleDuplicates")
+  transferSource       Transfer?             @relation("TransferSourceTxn")
+  transferDestination  Transfer?             @relation("TransferDestTxn")
+  goalContributions    GoalContribution[]
+  categorizationLogs   CategorizationLog[]
+
+  @@index([userId, transactionAt], name: "idx_transactions_user_date")
+  @@index([userId, categoryId, transactionAt], name: "idx_transactions_user_cat_date")
+  @@index([accountId, transactionAt], name: "idx_transactions_account_date")
+  @@index([cleanMerchantName], name: "idx_transactions_clean_merchant")
+  @@index([accountId, referenceHash], name: "idx_transactions_reference_hash")
+  @@map("transactions")
+}
+
+model Transfer {
+  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @map("transfer_id") @db.Uuid
+  userId                 String         @map("user_id") @db.Uuid
+  sourceAccountId        String         @map("source_account_id") @db.Uuid
+  destinationAccountId   String         @map("destination_account_id") @db.Uuid
+  sourceTransactionId    String         @unique @map("source_transaction_id") @db.Uuid
+  destinationTransactionId String       @unique @map("destination_transaction_id") @db.Uuid
+  amount                 Decimal        @map("amount") @db.Decimal(14, 2)
+  currency               String         @default("INR") @map("currency") @db.VarChar(3)
+  status                 TransferStatus @default(SETTLED) @map("status")
+  transferDate           DateTime       @map("transfer_date") @db.Timestamptz(6)
+  notes                  String?        @map("notes") @db.Text
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceAccount      FinancialAccount @relation("TransferSourceAccount", fields: [userId, sourceAccountId], references: [userId, id], onDelete: Restrict)
+  destinationAccount FinancialAccount @relation("TransferDestinationAccount", fields: [userId, destinationAccountId], references: [userId, id], onDelete: Restrict)
+  sourceTransaction  Transaction      @relation("TransferSourceTxn", fields: [sourceTransactionId], references: [id], onDelete: Cascade)
+  destinationTransaction Transaction  @relation("TransferDestTxn", fields: [destinationTransactionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, transferDate], name: "idx_transfers_user_date")
+  @@map("transfers")
+}
+
+model CategorizationLog {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @map("log_id") @db.Uuid
+  transactionId      String               @map("transaction_id") @db.Uuid
+  categoryId         String               @map("category_id") @db.Uuid
+  method             CategorizationMethod @map("method")
+  confidenceScore    Decimal?             @map("confidence_score") @db.Decimal(5, 4)
+  modelVersion       String               @default("rule_engine_v1.0") @map("model_version") @db.VarChar(50)
+  userOverridden     Boolean              @default(false) @map("user_overridden")
+  previousCategoryId String?              @map("previous_category_id") @db.Uuid
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  transaction      Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category         Category    @relation("PrimaryCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  previousCategory Category?   @relation("PreviousCategory", fields: [previousCategoryId], references: [id], onDelete: SetNull)
+
+  @@index([transactionId], name: "idx_cat_logs_transaction")
+  @@map("categorization_logs")
+}
+
+model Budget {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @map("budget_id") @db.Uuid
+  userId              String           @map("user_id") @db.Uuid
+  categoryId          String?          @map("category_id") @db.Uuid
+  name                String           @map("name") @db.VarChar(100)
+  periodType          BudgetPeriodType @default(MONTHLY) @map("period_type")
+  periodStart         DateTime         @map("period_start") @db.Date
+  periodEnd           DateTime         @map("period_end") @db.Date
+  limitAmount         Decimal          @map("limit_amount") @db.Decimal(14, 2)
+  warningThresholdPct Int              @default(80) @map("warning_threshold_pct")
+  status              BudgetStatus     @default(ACTIVE) @map("status")
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([userId, periodStart, periodEnd, status], name: "idx_budgets_user_period")
+  @@map("budgets")
+}
+
+model FinancialGoal {
+  id                        String             @id @default(dbgenerated("gen_random_uuid()")) @map("goal_id") @db.Uuid
+  userId                    String             @map("user_id") @db.Uuid
+  accountId                 String?            @map("account_id") @db.Uuid
+  name                      String             @map("name") @db.VarChar(100)
+  targetAmount              Decimal            @map("target_amount") @db.Decimal(14, 2)
+  cachedCurrentAmount       Decimal            @default(0.00) @map("cached_current_amount") @db.Decimal(14, 2)
+  targetDate                DateTime           @map("target_date") @db.Date
+  monthlyTargetContribution Decimal            @default(0.00) @map("monthly_target_contribution") @db.Decimal(14, 2)
+  priority                  Int                @default(1) @map("priority")
+  status                    GoalStatus         @default(IN_PROGRESS) @map("status")
+  notes                     String?            @map("notes") @db.Text
+  createdAt                 DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account       FinancialAccount?  @relation(fields: [userId, accountId], references: [userId, id], onDelete: SetNull)
+  contributions GoalContribution[]
+
+  @@unique([userId, id], name: "uq_financial_goals_user_goal")
+  @@index([userId, status], name: "idx_financial_goals_user_status")
+  @@map("financial_goals")
+}
+
+model GoalContribution {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @map("contribution_id") @db.Uuid
+  goalId           String           @map("goal_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  accountId        String?          @map("account_id") @db.Uuid
+  transactionId    String?          @map("transaction_id") @db.Uuid
+  amount           Decimal          @map("amount") @db.Decimal(14, 2)
+  contributionType ContributionType @default(ALLOCATION) @map("contribution_type")
+  contributionDate DateTime         @default(now()) @map("contribution_date") @db.Date
+  notes            String?          @map("notes") @db.Text
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  goal        FinancialGoal     @relation(fields: [userId, goalId], references: [userId, id], onDelete: Cascade)
+  account     FinancialAccount? @relation(fields: [userId, accountId], references: [userId, id], onDelete: SetNull)
+  transaction Transaction?      @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([goalId, contributionDate], name: "idx_contributions_goal")
+  @@index([userId], name: "idx_contributions_user")
+  @@map("goal_contributions")
+}
+
+model RecurringCommitment {
+  id                  String              @id @default(dbgenerated("gen_random_uuid()")) @map("commitment_id") @db.Uuid
+  userId              String              @map("user_id") @db.Uuid
+  categoryId          String              @map("category_id") @db.Uuid
+  accountId           String?             @map("account_id") @db.Uuid
+  merchantName        String              @map("merchant_name") @db.VarChar(150)
+  expectedAmount      Decimal             @map("expected_amount") @db.Decimal(14, 2)
+  frequency           CommitmentFrequency @default(MONTHLY) @map("frequency")
+  nextExpectedDate    DateTime            @map("next_expected_date") @db.Date
+  detectionConfidence Decimal?            @map("detection_confidence") @db.Decimal(5, 4)
+  isUserConfirmed     Boolean             @default(false) @map("is_user_confirmed")
+  status              CommitmentStatus    @default(ACTIVE) @map("status")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account  FinancialAccount? @relation(fields: [userId, accountId], references: [userId, id], onDelete: SetNull)
+
+  @@index([userId, nextExpectedDate, status], name: "idx_commitments_user_due")
+  @@map("recurring_commitments")
+}
+
+model Prediction {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @map("prediction_id") @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  categoryId        String?      @map("category_id") @db.Uuid
+  forecastType      ForecastType @map("forecast_type")
+  targetPeriodStart DateTime     @map("target_period_start") @db.Date
+  targetPeriodEnd   DateTime     @map("target_period_end") @db.Date
+  predictedAmount   Decimal      @map("predicted_amount") @db.Decimal(14, 2)
+  confidenceScore   Decimal?     @map("confidence_score") @db.Decimal(5, 4)
+  riskProbability   Decimal?     @map("risk_probability") @db.Decimal(5, 4)
+  modelVersion      String       @map("model_version") @db.VarChar(50)
+  inputWindowStart  DateTime     @map("input_window_start") @db.Date
+  inputWindowEnd    DateTime     @map("input_window_end") @db.Date
+  metadata          Json         @default("{}") @map("metadata")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([userId, targetPeriodStart, targetPeriodEnd], name: "idx_predictions_user_period")
+  @@index([modelVersion], name: "idx_predictions_model")
+  @@map("predictions")
+}
+
+model AdvisoryRequest {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @map("request_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  categoryId      String?  @map("category_id") @db.Uuid
+  purchaseAmount  Decimal  @map("purchase_amount") @db.Decimal(14, 2)
+  currency        String   @default("INR") @map("currency") @db.VarChar(3)
+  itemDescription String   @map("item_description") @db.VarChar(255)
+  userNotes       String?  @map("user_notes") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  decision AdvisoryDecision?
+
+  @@index([userId, createdAt], name: "idx_advisory_requests_user")
+  @@map("advisory_requests")
+}
+
+model AdvisoryDecision {
+  requestId             String          @id @map("request_id") @db.Uuid
+  decisionOutcome       AdvisoryOutcome @map("decision_outcome")
+  affordabilityScore    Decimal         @map("affordability_score") @db.Decimal(5, 2)
+  deterministicFactors  Json            @map("deterministic_factors")
+  budgetImpactSummary   Json            @map("budget_impact_summary")
+  goalImpactSummary     Json            @map("goal_impact_summary")
+  llmExplanation        String          @map("llm_explanation") @db.Text
+  disclaimer            String          @map("disclaimer") @db.Text
+  ruleEngineVersion     String          @map("rule_engine_version") @db.VarChar(50)
+  llmModelVersion       String          @map("llm_model_version") @db.VarChar(50)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  request AdvisoryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([decisionOutcome], name: "idx_advisory_decisions_outcome")
+  @@map("advisory_decisions")
+}
+
+model Feedback {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @map("feedback_id") @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  targetType     FeedbackTarget @map("target_type")
+  targetId       String         @map("target_id") @db.Uuid
+  rating         Int?           @map("rating")
+  feedbackText   String?        @map("feedback_text") @db.Text
+  correctionData Json           @default("{}") @map("correction_data")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId], name: "idx_feedbacks_target")
+  @@index([userId], name: "idx_feedbacks_user")
+  @@map("feedbacks")
+}
+
+model Notification {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @map("notification_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  notificationType NotificationType @map("notification_type")
+  title            String           @map("title") @db.VarChar(255)
+  message          String           @map("message") @db.Text
+  payload          Json             @default("{}") @map("payload")
+  isRead           Boolean          @default(false) @map("is_read")
+  readAt           DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt], name: "idx_notifications_user_unread")
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @map("event_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorRole  String   @default("SYSTEM") @map("actor_role") @db.VarChar(50)
+  action     String   @map("action") @db.VarChar(100)
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   String   @map("entity_id") @db.VarChar(100)
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  userAgent  String?  @map("user_agent") @db.Text
+  metadata   Json     @default("{}") @map("metadata")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([actorId, createdAt], name: "idx_audit_events_actor")
+  @@index([entityType, entityId], name: "idx_audit_events_entity")
+  @@index([action, createdAt], name: "idx_audit_events_action_date")
+  @@map("audit_events")
+}

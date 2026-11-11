@@ -1,0 +1,56 @@
+erDiagram
+    USERS ||--|| USER_PROFILES : "configures"
+    USERS ||--o{ CONSENTS : "grants"
+    USERS |o--o{ AUDIT_EVENTS : "triggers"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ FEEDBACKS : "submits"
+
+    USERS ||--o{ FINANCIAL_ACCOUNTS : "owns"
+    FINANCIAL_ACCOUNTS ||--o{ ACCOUNT_BALANCE_SNAPSHOTS : "anchored_by"
+
+    USERS ||--o{ DATA_SOURCES : "authorizes"
+    FINANCIAL_ACCOUNTS |o--o{ DATA_SOURCES : "maps_default_account"
+    DATA_SOURCES ||--o{ IMPORT_BATCHES : "produces"
+    IMPORT_BATCHES ||--o{ RAW_MESSAGES : "contains"
+    RAW_MESSAGES |o--o{ RAW_MESSAGES : "duplicate_candidate_of"
+
+    USERS |o--o{ CATEGORIES : "creates_custom"
+    CATEGORIES |o--o{ CATEGORIES : "parent_of"
+
+    USERS ||--o{ TRANSACTIONS : "owns"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSACTIONS : "ledger_account_for"
+    CATEGORIES ||--o{ TRANSACTIONS : "classifies"
+    IMPORT_BATCHES |o--o{ TRANSACTIONS : "ingested_via"
+    RAW_MESSAGES |o--o{ TRANSACTIONS : "normalized_from"
+
+    TRANSACTIONS |o--o{ TRANSACTIONS : "possible_duplicate_of"
+    TRANSACTIONS |o--o{ TRANSACTIONS : "refunds_or_reverses"
+    TRANSACTIONS ||--o{ CATEGORIZATION_LOGS : "logs_decision_for"
+    CATEGORIES ||--o{ CATEGORIZATION_LOGS : "assigned_category"
+    CATEGORIES |o--o{ CATEGORIZATION_LOGS : "overrides_previous"
+
+    USERS ||--o{ TRANSFERS : "executes"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSFERS : "source_account"
+    FINANCIAL_ACCOUNTS ||--o{ TRANSFERS : "destination_account"
+    TRANSACTIONS |o--o| TRANSFERS : "debit_leg"
+    TRANSACTIONS |o--o| TRANSFERS : "credit_leg"
+
+    USERS ||--o{ BUDGETS : "defines"
+    CATEGORIES |o--o{ BUDGETS : "limits_spending_for"
+
+    USERS ||--o{ FINANCIAL_GOALS : "targets"
+    FINANCIAL_ACCOUNTS |o--o{ FINANCIAL_GOALS : "dedicated_savings_account"
+    FINANCIAL_GOALS ||--o{ GOAL_CONTRIBUTIONS : "accumulates"
+    FINANCIAL_ACCOUNTS |o--o{ GOAL_CONTRIBUTIONS : "funded_from"
+    TRANSACTIONS |o--o{ GOAL_CONTRIBUTIONS : "linked_transaction"
+
+    USERS ||--o{ RECURRING_COMMITMENTS : "subscribes_to"
+    CATEGORIES ||--o{ RECURRING_COMMITMENTS : "categorizes_bill"
+    FINANCIAL_ACCOUNTS |o--o{ RECURRING_COMMITMENTS : "debited_from"
+
+    USERS ||--o{ PREDICTIONS : "receives_forecast"
+    CATEGORIES |o--o{ PREDICTIONS : "forecasted_category"
+
+    USERS ||--o{ ADVISORY_REQUESTS : "inquires"
+    CATEGORIES |o--o{ ADVISORY_REQUESTS : "item_category"
+    ADVISORY_REQUESTS ||--o| ADVISORY_DECISIONS : "evaluated_by"

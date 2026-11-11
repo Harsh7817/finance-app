@@ -1,0 +1,420 @@
+// ============================================================================
+// AI-Powered Personal Finance & Smart Expenditure Advisor
+// Complete Database Markup Language (DBML v2.0) Schema (v1.1 - Hardened)
+// Visualizer support: https://dbdiagram.io / https://dbdocs.io
+// ============================================================================
+
+Project finance_advisor {
+  database_type: 'PostgreSQL'
+  Note: 'AI-Powered Personal Finance & Smart Expenditure Advisor Hardened Relational Schema'
+}
+
+Table users {
+  user_id uuid [pk, default: `gen_random_uuid()`]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255) [not null, note: 'Bcrypt/Argon2id hash']
+  role varchar(50) [not null, default: 'END_USER']
+  status varchar(50) [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  deleted_at timestamptz [null]
+}
+
+Table user_profiles {
+  profile_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [unique, not null]
+  base_currency varchar(3) [not null, default: 'INR']
+  monthly_stated_income numeric(14,2) [not null, default: 0.00]
+  savings_target_percentage numeric(5,2) [not null, default: 20.00]
+  risk_tolerance varchar(50) [not null, default: 'MODERATE']
+  notification_preferences jsonb [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table consents {
+  consent_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  purpose varchar(100) [not null]
+  scope varchar(255) [not null]
+  status varchar(50) [not null, default: 'GRANTED']
+  consent_version varchar(20) [not null, default: '1.0']
+  ip_address varchar(45) [null]
+  user_agent text [null]
+  granted_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  expires_at timestamptz [null]
+  withdrawn_at timestamptz [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table financial_accounts {
+  account_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  account_name varchar(100) [not null]
+  account_type varchar(50) [not null]
+  institution_name varchar(100) [not null]
+  account_mask varchar(10) [null, note: 'Masked string e.g. *1234']
+  currency varchar(3) [not null, default: 'INR']
+  cached_balance numeric(14,2) [not null, default: 0.00]
+  last_reconciled_at timestamptz [null]
+  status varchar(50) [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (user_id, account_id) [unique]
+  }
+}
+
+Table account_balance_snapshots {
+  snapshot_id uuid [pk, default: `gen_random_uuid()`]
+  account_id uuid [not null]
+  user_id uuid [not null]
+  balance_amount numeric(14,2) [not null]
+  as_of_timestamp timestamptz [not null]
+  snapshot_source varchar(50) [not null, default: 'STATEMENT_IMPORT']
+  statement_reference varchar(100) [null]
+  is_reconciled boolean [not null, default: true]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table data_sources {
+  source_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  account_id uuid [null]
+  source_type varchar(50) [not null]
+  provider_name varchar(100) [not null]
+  is_active boolean [not null, default: true]
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (user_id, source_id) [unique]
+  }
+}
+
+Table import_batches {
+  batch_id uuid [pk, default: `gen_random_uuid()`]
+  source_id uuid [not null]
+  user_id uuid [not null]
+  batch_reference varchar(100) [null]
+  file_hash varchar(64) [null]
+  status varchar(50) [not null, default: 'PENDING']
+  total_records integer [not null, default: 0]
+  parsed_records integer [not null, default: 0]
+  duplicate_records integer [not null, default: 0]
+  failed_records integer [not null, default: 0]
+  error_summary jsonb [not null, default: '[]']
+  started_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  completed_at timestamptz [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (user_id, batch_id) [unique]
+  }
+}
+
+Table raw_messages {
+  message_id uuid [pk, default: `gen_random_uuid()`]
+  batch_id uuid [not null]
+  source_id uuid [not null]
+  user_id uuid [not null]
+  external_message_id varchar(100) [null]
+  content_hash varchar(64) [not null]
+  sanitized_preview text [null]
+  processing_status varchar(50) [not null, default: 'PENDING']
+  duplicate_of_id uuid [null]
+  parser_version varchar(50) [not null, default: 'v1.0']
+  rejection_reason text [null]
+  received_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (source_id, external_message_id) [unique]
+  }
+}
+
+Table categories {
+  category_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [null, note: 'NULL for global defaults; user UUID for custom categories']
+  parent_id uuid [null]
+  name varchar(50) [not null]
+  category_type varchar(50) [not null, default: 'EXPENSE']
+  icon varchar(50) [null]
+  color_hex varchar(7) [null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table transactions {
+  transaction_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  account_id uuid [not null]
+  batch_id uuid [null]
+  raw_message_id uuid [null]
+  category_id uuid [not null]
+  amount numeric(14,2) [not null]
+  currency varchar(3) [not null, default: 'INR']
+  type varchar(50) [not null]
+  status varchar(50) [not null, default: 'POSTED']
+  duplicate_status varchar(50) [not null, default: 'NOT_DUPLICATE']
+  possible_duplicate_of_id uuid [null]
+  merchant_name varchar(150) [not null]
+  clean_merchant_name varchar(150) [not null]
+  description text [null]
+  transaction_at timestamptz [not null]
+  posting_date date [not null]
+  reference_hash varchar(64) [not null]
+  external_reference varchar(100) [null]
+  original_transaction_id uuid [null]
+  is_recurring boolean [not null, default: false]
+  is_user_verified boolean [not null, default: false]
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  deleted_at timestamptz [null]
+
+  indexes {
+    (account_id, external_reference) [unique]
+  }
+}
+
+Table transfers {
+  transfer_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  source_account_id uuid [not null]
+  destination_account_id uuid [not null]
+  source_transaction_id uuid [unique, not null]
+  destination_transaction_id uuid [unique, not null]
+  amount numeric(14,2) [not null]
+  currency varchar(3) [not null, default: 'INR']
+  status varchar(50) [not null, default: 'SETTLED']
+  transfer_date timestamptz [not null]
+  notes text [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table categorization_logs {
+  log_id uuid [pk, default: `gen_random_uuid()`]
+  transaction_id uuid [not null]
+  category_id uuid [not null]
+  method varchar(50) [not null]
+  confidence_score numeric(5,4) [null]
+  model_version varchar(50) [not null]
+  user_overridden boolean [not null, default: false]
+  previous_category_id uuid [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table budgets {
+  budget_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  category_id uuid [null, note: 'NULL for total monthly budget']
+  name varchar(100) [not null]
+  period_type varchar(50) [not null, default: 'MONTHLY']
+  period_start date [not null]
+  period_end date [not null]
+  limit_amount numeric(14,2) [not null]
+  warning_threshold_pct integer [not null, default: 80]
+  status varchar(50) [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table financial_goals {
+  goal_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  account_id uuid [null]
+  name varchar(100) [not null]
+  target_amount numeric(14,2) [not null]
+  cached_current_amount numeric(14,2) [not null, default: 0.00]
+  target_date date [not null]
+  monthly_target_contribution numeric(14,2) [not null, default: 0.00]
+  priority integer [not null, default: 1]
+  status varchar(50) [not null, default: 'IN_PROGRESS']
+  notes text [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    (user_id, goal_id) [unique]
+  }
+}
+
+Table goal_contributions {
+  contribution_id uuid [pk, default: `gen_random_uuid()`]
+  goal_id uuid [not null]
+  user_id uuid [not null]
+  account_id uuid [null]
+  transaction_id uuid [null]
+  amount numeric(14,2) [not null]
+  contribution_type varchar(50) [not null, default: 'ALLOCATION']
+  contribution_date date [not null, default: `CURRENT_DATE`]
+  notes text [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table recurring_commitments {
+  commitment_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  category_id uuid [not null]
+  account_id uuid [null]
+  merchant_name varchar(150) [not null]
+  expected_amount numeric(14,2) [not null]
+  frequency varchar(50) [not null, default: 'MONTHLY']
+  next_expected_date date [not null]
+  detection_confidence numeric(5,4) [null]
+  is_user_confirmed boolean [not null, default: false]
+  status varchar(50) [not null, default: 'ACTIVE']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table predictions {
+  prediction_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  category_id uuid [null]
+  forecast_type varchar(50) [not null]
+  target_period_start date [not null]
+  target_period_end date [not null]
+  predicted_amount numeric(14,2) [not null]
+  confidence_score numeric(5,4) [null]
+  risk_probability numeric(5,4) [null]
+  model_version varchar(50) [not null]
+  input_window_start date [not null]
+  input_window_end date [not null]
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table advisory_requests {
+  request_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  category_id uuid [null]
+  purchase_amount numeric(14,2) [not null]
+  currency varchar(3) [not null, default: 'INR']
+  item_description varchar(255) [not null]
+  user_notes text [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table advisory_decisions {
+  request_id uuid [pk]
+  decision_outcome varchar(50) [not null]
+  affordability_score numeric(5,2) [not null]
+  deterministic_factors jsonb [not null]
+  budget_impact_summary jsonb [not null]
+  goal_impact_summary jsonb [not null]
+  llm_explanation text [not null]
+  disclaimer text [not null]
+  rule_engine_version varchar(50) [not null]
+  llm_model_version varchar(50) [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table feedbacks {
+  feedback_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  target_type varchar(50) [not null]
+  target_id uuid [not null]
+  rating integer [null]
+  feedback_text text [null]
+  correction_data jsonb [not null, default: '{}']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table notifications {
+  notification_id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  notification_type varchar(50) [not null]
+  title varchar(255) [not null]
+  message text [not null]
+  payload jsonb [not null, default: '{}']
+  is_read boolean [not null, default: false]
+  read_at timestamptz [null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table audit_events {
+  event_id uuid [pk, default: `gen_random_uuid()`]
+  actor_id uuid [null]
+  actor_role varchar(50) [not null, default: 'SYSTEM']
+  action varchar(100) [not null]
+  entity_type varchar(50) [not null]
+  entity_id varchar(100) [not null]
+  ip_address varchar(45) [null]
+  user_agent text [null]
+  metadata jsonb [not null, default: '{}']
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================================================
+// RELATIONSHIPS
+// ============================================================================
+
+Ref: user_profiles.user_id - users.user_id [delete: cascade]
+Ref: consents.user_id > users.user_id [delete: cascade]
+Ref: financial_accounts.user_id > users.user_id [delete: cascade]
+
+Ref: account_balance_snapshots.(user_id, account_id) > financial_accounts.(user_id, account_id) [delete: cascade]
+Ref: data_sources.(user_id, account_id) > financial_accounts.(user_id, account_id) [delete: set null]
+Ref: data_sources.user_id > users.user_id [delete: cascade]
+
+Ref: import_batches.(user_id, source_id) > data_sources.(user_id, source_id) [delete: cascade]
+Ref: import_batches.user_id > users.user_id [delete: cascade]
+
+Ref: raw_messages.(user_id, batch_id) > import_batches.(user_id, batch_id) [delete: cascade]
+Ref: raw_messages.source_id > data_sources.source_id [delete: cascade]
+Ref: raw_messages.user_id > users.user_id [delete: cascade]
+Ref: raw_messages.duplicate_of_id > raw_messages.message_id [delete: set null]
+
+Ref: categories.user_id > users.user_id [delete: cascade]
+Ref: categories.parent_id > categories.category_id [delete: set null]
+
+Ref: transactions.(user_id, account_id) > financial_accounts.(user_id, account_id) [delete: restrict]
+Ref: transactions.user_id > users.user_id [delete: cascade]
+Ref: transactions.batch_id > import_batches.batch_id [delete: set null]
+Ref: transactions.raw_message_id > raw_messages.message_id [delete: set null]
+Ref: transactions.category_id > categories.category_id [delete: restrict]
+Ref: transactions.original_transaction_id - transactions.transaction_id [delete: set null]
+Ref: transactions.possible_duplicate_of_id - transactions.transaction_id [delete: set null]
+
+Ref: transfers.user_id > users.user_id [delete: cascade]
+Ref: transfers.(user_id, source_account_id) > financial_accounts.(user_id, account_id) [delete: restrict]
+Ref: transfers.(user_id, destination_account_id) > financial_accounts.(user_id, account_id) [delete: restrict]
+Ref: transfers.source_transaction_id - transactions.transaction_id [delete: cascade]
+Ref: transfers.destination_transaction_id - transactions.transaction_id [delete: cascade]
+
+Ref: categorization_logs.transaction_id > transactions.transaction_id [delete: cascade]
+Ref: categorization_logs.category_id > categories.category_id [delete: restrict]
+Ref: categorization_logs.previous_category_id > categories.category_id [delete: set null]
+
+Ref: budgets.user_id > users.user_id [delete: cascade]
+Ref: budgets.category_id > categories.category_id [delete: restrict]
+
+Ref: financial_goals.user_id > users.user_id [delete: cascade]
+Ref: financial_goals.(user_id, account_id) > financial_accounts.(user_id, account_id) [delete: set null]
+
+Ref: goal_contributions.(user_id, goal_id) > financial_goals.(user_id, goal_id) [delete: cascade]
+Ref: goal_contributions.(user_id, account_id) > financial_accounts.(user_id, account_id) [delete: set null]
+Ref: goal_contributions.transaction_id > transactions.transaction_id [delete: set null]
+
+Ref: recurring_commitments.user_id > users.user_id [delete: cascade]
+Ref: recurring_commitments.category_id > categories.category_id [delete: restrict]
+Ref: recurring_commitments.(user_id, account_id) > financial_accounts.(user_id, account_id) [delete: set null]
+
+Ref: predictions.user_id > users.user_id [delete: cascade]
+Ref: predictions.category_id > categories.category_id [delete: restrict]
+
+Ref: advisory_requests.user_id > users.user_id [delete: cascade]
+Ref: advisory_requests.category_id > categories.category_id [delete: set null]
+Ref: advisory_decisions.request_id - advisory_requests.request_id [delete: cascade]
+
+Ref: feedbacks.user_id > users.user_id [delete: cascade]
+Ref: notifications.user_id > users.user_id [delete: cascade]
+Ref: audit_events.actor_id > users.user_id [delete: set null]
