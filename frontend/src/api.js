@@ -99,5 +99,20 @@ export const api = {
   detectRecurring: () => request('/recurring/detect', { method: 'POST', body: JSON.stringify({ lookbackDays: 90 }) }),
   getRecurringUpcoming: () => request('/recurring/upcoming'),
   getRecurringAlerts: () => request('/recurring/alerts'),
+
+  // Intelligence & Predictions (Phase 10)
+  getSpendingPatterns: (params = '') => request(`/intelligence/spending-patterns${params}`),
+  getForecast: (params = '') => request(`/intelligence/forecast${params}`),
+  getHealthScore: () => request('/intelligence/health-score'),
+  getAnomalies: (params = '') => request(`/intelligence/anomalies${params}`),
+  recordForecast: (data) => request('/intelligence/forecast/record', { method: 'POST', body: JSON.stringify(data) }),
+  getForecastEvaluations: () => request('/intelligence/forecast/evaluations'),
+
+  // Smart Expenditure Advisor (Phase 11)
+  evaluatePurchase: (data) => request('/advisory/evaluate', { method: 'POST', body: JSON.stringify(data) }),
+  getAdvisoryHistory: (params = '') => request(`/advisory/history${params}`),
+  getAdvisorySummary: () => request('/advisory/summary'),
+  getAdvisoryById: (id) => request(`/advisory/${id}`),
+  submitAdvisoryFeedback: (id, data) => request(`/advisory/${id}/feedback`, { method: 'POST', body: JSON.stringify(data) }),
 };
 

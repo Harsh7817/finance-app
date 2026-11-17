@@ -18,6 +18,12 @@ import {
   TrendingUp,
   X,
   Search,
+  Brain,
+  Activity,
+  ShieldAlert,
+  Sparkles,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 
 export default function App() {
@@ -42,6 +48,21 @@ export default function App() {
   const [recurring, setRecurring] = useState([]);
   const [recurringAlerts, setRecurringAlerts] = useState(null);
   const [categories, setCategories] = useState([]);
+
+  // Phase 10 Intelligence & Prediction Data
+  const [healthScore, setHealthScore] = useState(null);
+  const [forecast, setForecast] = useState(null);
+  const [spendingPatterns, setSpendingPatterns] = useState(null);
+  const [anomalies, setAnomalies] = useState(null);
+
+  // Phase 11 Smart Expenditure Advisor Data & Modal
+  const [showAdvisorModal, setShowAdvisorModal] = useState(false);
+  const [advisoryHistory, setAdvisoryHistory] = useState([]);
+  const [advisorySummary, setAdvisorySummary] = useState(null);
+  const [advisorForm, setAdvisorForm] = useState({ purchaseAmount: '', itemDescription: '', categoryId: '', userNotes: '' });
+  const [evaluationResult, setEvaluationResult] = useState(null);
+  const [evaluating, setEvaluating] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState({});
 
   // Modals
   const [showAddTxModal, setShowAddTxModal] = useState(false);
@@ -96,9 +117,15 @@ export default function App() {
       setRecurring(rData?.commitments || []);
       setCategories(catData?.categories || []);
 
-      // Load Alerts asynchronously
+      // Load Alerts, Intelligence & Advisory asynchronously
       api.getBudgetAlerts().then(res => setBudgetAlerts(res?.alerts || [])).catch(() => {});
       api.getRecurringAlerts().then(res => setRecurringAlerts(res)).catch(() => {});
+      api.getHealthScore().then(res => setHealthScore(res)).catch(() => {});
+      api.getForecast().then(res => setForecast(res)).catch(() => {});
+      api.getSpendingPatterns().then(res => setSpendingPatterns(res)).catch(() => {});
+      api.getAnomalies().then(res => setAnomalies(res)).catch(() => {});
+      api.getAdvisoryHistory('?limit=5').then(res => setAdvisoryHistory(res?.history || [])).catch(() => {});
+      api.getAdvisorySummary().then(res => setAdvisorySummary(res)).catch(() => {});
     } catch (err) {
       showToast(err.message, true);
     } finally {
@@ -274,6 +301,46 @@ export default function App() {
       const res = await api.detectRecurring();
       showToast(`Analyzed! Found ${res.detected} recurring pattern(s).`);
       loadAllData();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
+
+  // Phase 11: Evaluate Purchase with Smart Expenditure Advisor
+  const handleEvaluatePurchase = async (e) => {
+    e.preventDefault();
+    if (!advisorForm.purchaseAmount || !advisorForm.itemDescription) {
+      return showToast('Item description and amount are required', true);
+    }
+    setEvaluating(true);
+    try {
+      const res = await api.evaluatePurchase({
+        purchaseAmount: parseFloat(advisorForm.purchaseAmount),
+        itemDescription: advisorForm.itemDescription,
+        categoryId: advisorForm.categoryId || null,
+        userNotes: advisorForm.userNotes || null,
+      });
+      setEvaluationResult(res);
+      showToast(`Recommendation: ${res.decisionOutcome}`);
+      api.getAdvisoryHistory('?limit=5').then(r => setAdvisoryHistory(r?.history || [])).catch(() => {});
+      api.getAdvisorySummary().then(s => setAdvisorySummary(s)).catch(() => {});
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  // Submit Feedback on Advisory Decision
+  const handleAdvisoryFeedback = async (requestId, wasHelpful) => {
+    try {
+      await api.submitAdvisoryFeedback(requestId, {
+        rating: wasHelpful ? 5 : 2,
+        feedbackText: wasHelpful ? 'User marked as helpful' : 'User found unhelpful',
+        wasHelpful,
+      });
+      setFeedbackSent(prev => ({ ...prev, [requestId]: wasHelpful }));
+      showToast('Thank you for your feedback!');
     } catch (err) {
       showToast(err.message, true);
     }
@@ -489,6 +556,37 @@ export default function App() {
               <button className="action-btn" onClick={() => setShowAddAccountModal(true)}>
                 <div className="action-icon"><CreditCard size={20} /></div>
                 <span>New Acc</span>
+              </button>
+            </div>
+
+            {/* Smart Expenditure Advisor Quick Entry Banner */}
+            <div
+              className="glass-card-interactive"
+              onClick={() => {
+                setEvaluationResult(null);
+                setShowAdvisorModal(true);
+              }}
+              style={{
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.16) 0%, rgba(59, 130, 246, 0.12) 100%)',
+                border: '1px solid rgba(139, 92, 246, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(139, 92, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Sparkles size={20} color="#C084FC" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-main)' }}>Can I Afford This?</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Ask AI Smart Expenditure Advisor</div>
+                </div>
+              </div>
+              <button style={{ background: 'var(--accent-purple)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 8, cursor: 'pointer' }}>
+                Check Now
               </button>
             </div>
 
@@ -764,6 +862,240 @@ export default function App() {
             ))}
           </div>
         )}
+
+        {/* TAB 6: PHASE 10 FINANCIAL INTELLIGENCE & PREDICTIONS */}
+        {activeTab === 'intelligence' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 18, fontWeight: 800 }}>Financial Intelligence</h2>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Deterministic analytics & forecast engine</p>
+              </div>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Brain size={18} color="var(--accent-primary)" />
+              </div>
+            </div>
+
+            {/* 1. FINANCIAL HEALTH SCORE CARD */}
+            <div className="glass-card" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>FINANCIAL HEALTH INDEX</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, color: 'var(--text-main)' }}>{healthScore?.score ?? '--'}</span>
+                    <span style={{ fontSize: 14, color: 'var(--text-dim)' }}>/ 100</span>
+                  </div>
+                </div>
+                <span className={`badge ${healthScore?.rating === 'EXCELLENT' || healthScore?.rating === 'GOOD' ? 'badge-green' : 'badge-amber'}`} style={{ fontSize: 11, padding: '4px 10px' }}>
+                  {healthScore?.rating || 'EVALUATING'}
+                </span>
+              </div>
+
+              {/* 5 Pillars Progress */}
+              {healthScore?.pillarScores && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-color)' }}>
+                  {Object.entries(healthScore.pillarScores).map(([key, val]) => {
+                    const label = key === 'savingsRate' ? 'Savings Rate'
+                      : key === 'incomeExpenseRatio' ? 'Income-to-Expense'
+                      : key === 'budgetAdherence' ? 'Budget Adherence'
+                      : key === 'recurringBurden' ? 'Recurring Burden'
+                      : 'Goal Velocity';
+                    const pct = (val.score / val.max) * 100;
+                    return (
+                      <div key={key}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>
+                          <span>{label}</span>
+                          <span style={{ fontWeight: 600 }}>{val.score}/{val.max} pts</span>
+                        </div>
+                        <div className="progress-bar-bg" style={{ height: 4 }}>
+                          <div className="progress-bar-fill" style={{ width: `${pct}%`, background: pct >= 75 ? 'var(--accent-emerald)' : pct >= 50 ? 'var(--accent-primary)' : 'var(--accent-rose)' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Diagnostic Recommendations */}
+              {healthScore?.recommendations && healthScore.recommendations.length > 0 && (
+                <div style={{ marginTop: 14, padding: 10, background: 'rgba(0,0,0,0.25)', borderRadius: 10, fontSize: 11, color: 'var(--text-muted)' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Activity size={12} color="var(--accent-primary)" /> Key Takeaway
+                  </div>
+                  {healthScore.recommendations[0]}
+                </div>
+              )}
+            </div>
+
+            {/* 2. FORECASTING & BALANCE PROJECTION */}
+            <div className="glass-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Month-End Expenditure Forecast</div>
+                <span className="badge badge-blue" style={{ fontSize: 10 }}>{forecast?.forecastMonth || 'Current Month'}</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 12 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Projected Spend</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4, color: 'var(--accent-rose)' }}>
+                    {formatINR(forecast?.projection?.projectedMonthEndExpenditure || 0)}
+                  </div>
+                </div>
+                <div style={{ background: 'var(--bg-tertiary)', padding: 12, borderRadius: 12 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Projected Balance</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, marginTop: 4, color: 'var(--accent-emerald)' }}>
+                    {formatINR(forecast?.projection?.projectedMonthEndBalance || 0)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                <span>Daily Run Rate: {formatINR(forecast?.actualToDate?.averageDailyBurnRate || 0)}/day</span>
+                <span>Confidence: {forecast?.projection?.confidenceScore ? `${Math.round(forecast.projection.confidenceScore * 100)}%` : '--'}</span>
+              </div>
+            </div>
+
+            {/* 3. SPENDING PATTERNS & FREQUENT MERCHANTS */}
+            {spendingPatterns && (
+              <div className="glass-card">
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Spending Velocity & Patterns</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14, textAlign: 'center' }}>
+                  <div style={{ background: 'var(--bg-tertiary)', padding: 10, borderRadius: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Daily Avg</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginTop: 4 }}>{formatINR(spendingPatterns.summary.averageDailySpend)}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-tertiary)', padding: 10, borderRadius: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Weekly Avg</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginTop: 4 }}>{formatINR(spendingPatterns.summary.averageWeeklySpend)}</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-tertiary)', padding: 10, borderRadius: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Avg Ticket</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginTop: 4 }}>{formatINR(spendingPatterns.summary.averageTicketSize)}</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Frequent Merchants</div>
+                {spendingPatterns.frequentMerchants.slice(0, 4).map((m, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < 3 ? '1px solid var(--border-color)' : 'none', fontSize: 12 }}>
+                    <div>
+                      <span style={{ fontWeight: 600 }}>{m.merchantName}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>({m.visitCount} visits)</span>
+                    </div>
+                    <span style={{ fontWeight: 700 }}>{formatINR(m.totalSpent)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 4. ANOMALY DETECTION ALERTS */}
+            <div className="glass-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700 }}>
+                  <ShieldAlert size={16} color="var(--accent-amber)" />
+                  <span>Spending Anomaly Detection</span>
+                </div>
+                <span className={`badge ${anomalies?.anomalyCount > 0 ? 'badge-rose' : 'badge-green'}`} style={{ fontSize: 10 }}>
+                  {anomalies?.anomalyCount || 0} flagged
+                </span>
+              </div>
+
+              {anomalies?.anomalyCount > 0 ? (
+                anomalies.anomalies.map((a, idx) => (
+                  <div key={idx} style={{ padding: 10, background: 'var(--bg-tertiary)', borderRadius: 10, marginBottom: 8, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700 }}>{a.merchantName}</span>
+                      <span style={{ fontWeight: 800, color: 'var(--accent-rose)' }}>{formatINR(a.amount)}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.reason}</div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '6px 0' }}>
+                  No statistical anomalies detected. All recent debit transactions align with typical spending baselines.
+                </div>
+              )}
+            </div>
+
+            {/* 5. SMART EXPENDITURE ADVISOR SECTION */}
+            <div className="glass-card" style={{ background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(59, 130, 246, 0.10) 100%)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700 }}>
+                  <Sparkles size={16} color="var(--accent-purple)" />
+                  <span>Smart Expenditure Advisor</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setEvaluationResult(null);
+                    setShowAdvisorModal(true);
+                  }}
+                  style={{ background: 'var(--accent-purple)', border: 'none', color: '#fff', fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 8, cursor: 'pointer' }}
+                >
+                  + New Evaluation
+                </button>
+              </div>
+
+              {advisorySummary && advisorySummary.totalEvaluations > 0 ? (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12, textAlign: 'center' }}>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: 8, borderRadius: 8 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>BUY</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-emerald)', marginTop: 2 }}>{advisorySummary.distribution.BUY}</div>
+                    </div>
+                    <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: 8, borderRadius: 8 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>WAIT</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-amber)', marginTop: 2 }}>{advisorySummary.distribution.CONSIDER_WAITING}</div>
+                    </div>
+                    <div style={{ background: 'rgba(244, 63, 94, 0.15)', padding: 8, borderRadius: 8 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>AVOID</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-rose)', marginTop: 2 }}>{advisorySummary.distribution.AVOID_FOR_NOW}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>Recent Advisory Decisions</div>
+                  {advisoryHistory.map((item) => (
+                    <div key={item.requestId} style={{ padding: 10, background: 'var(--bg-tertiary)', borderRadius: 10, marginBottom: 8, fontSize: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700 }}>{item.itemDescription}</span>
+                        <span className={`badge ${item.decisionOutcome === 'BUY' ? 'badge-green' : item.decisionOutcome === 'CONSIDER_WAITING' ? 'badge-amber' : 'badge-rose'}`} style={{ fontSize: 9 }}>
+                          {item.decisionOutcome}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
+                        <span>Amount: {formatINR(item.purchaseAmount)}</span>
+                        <span>Score: {item.affordabilityScore}/100</span>
+                      </div>
+                      {/* User Feedback Pill */}
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 6 }}>
+                        <button
+                          onClick={() => handleAdvisoryFeedback(item.requestId, true)}
+                          style={{
+                            background: feedbackSent[item.requestId] === true ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255,255,255,0.06)',
+                            border: 'none', color: '#fff', fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                          }}
+                        >
+                          <ThumbsUp size={10} /> Helpful
+                        </button>
+                        <button
+                          onClick={() => handleAdvisoryFeedback(item.requestId, false)}
+                          style={{
+                            background: feedbackSent[item.requestId] === false ? 'rgba(244, 63, 94, 0.3)' : 'rgba(255,255,255,0.06)',
+                            border: 'none', color: '#fff', fontSize: 10, padding: '3px 8px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                          }}
+                        >
+                          <ThumbsDown size={10} /> Not helpful
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'center', padding: '10px 0' }}>
+                  No purchases evaluated yet. Enter a purchase to get data-backed affordability advice!
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* BOTTOM NAVIGATION BAR */}
@@ -787,6 +1119,10 @@ export default function App() {
         <button className={`nav-item ${activeTab === 'recurring' ? 'active' : ''}`} onClick={() => setActiveTab('recurring')}>
           <Repeat size={20} />
           <span>Recurring</span>
+        </button>
+        <button className={`nav-item ${activeTab === 'intelligence' ? 'active' : ''}`} onClick={() => setActiveTab('intelligence')}>
+          <Brain size={20} />
+          <span>Insights</span>
         </button>
       </div>
 
@@ -986,6 +1322,193 @@ export default function App() {
                 {loading ? 'Uploading & Parsing...' : 'Upload & Parse'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: SMART EXPENDITURE ADVISOR EVALUATION */}
+      {showAdvisorModal && (
+        <div className="modal-overlay" onClick={() => setShowAdvisorModal(false)}>
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '88vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(139, 92, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Sparkles size={16} color="#C084FC" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800 }}>Smart Expenditure Advisor</h3>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>AI purchase affordability guidance</div>
+                </div>
+              </div>
+              <button onClick={() => setShowAdvisorModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Input Form */}
+            <form onSubmit={handleEvaluatePurchase} style={{ marginBottom: 16 }}>
+              <div className="form-group">
+                <label className="form-label">Item / Service Description</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Sony WH-1000XM5 Headphones or Gym Pass"
+                  className="form-input"
+                  value={advisorForm.itemDescription}
+                  onChange={(e) => setAdvisorForm({ ...advisorForm, itemDescription: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Proposed Purchase Amount (INR)</label>
+                <input
+                  required
+                  type="number"
+                  placeholder="12000"
+                  className="form-input"
+                  value={advisorForm.purchaseAmount}
+                  onChange={(e) => setAdvisorForm({ ...advisorForm, purchaseAmount: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Category (Optional — auto-inferred if blank)</label>
+                <select
+                  className="form-select"
+                  value={advisorForm.categoryId}
+                  onChange={(e) => setAdvisorForm({ ...advisorForm, categoryId: e.target.value })}
+                >
+                  <option value="">Auto-Detect Category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">User Notes (Optional context)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. On sale for Diwali; replacement for broken pair"
+                  className="form-input"
+                  value={advisorForm.userNotes}
+                  onChange={(e) => setAdvisorForm({ ...advisorForm, userNotes: e.target.value })}
+                />
+              </div>
+
+              <button type="submit" className="btn-primary" disabled={evaluating} style={{ background: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%)', marginTop: 8 }}>
+                {evaluating ? 'Analyzing Financial Context...' : 'Evaluate Affordability'}
+              </button>
+            </form>
+
+            {/* Evaluation Results Card */}
+            {evaluationResult && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-color)' }}>
+                {/* Decision Outcome Badge */}
+                <div
+                  style={{
+                    padding: '14px',
+                    borderRadius: 14,
+                    background:
+                      evaluationResult.decisionOutcome === 'BUY'
+                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.1) 100%)'
+                        : evaluationResult.decisionOutcome === 'CONSIDER_WAITING'
+                        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.1) 100%)'
+                        : 'linear-gradient(135deg, rgba(244, 63, 94, 0.25) 0%, rgba(244, 63, 94, 0.1) 100%)',
+                    border: `1px solid ${
+                      evaluationResult.decisionOutcome === 'BUY'
+                        ? 'rgba(16, 185, 129, 0.4)'
+                        : evaluationResult.decisionOutcome === 'CONSIDER_WAITING'
+                        ? 'rgba(245, 158, 11, 0.4)'
+                        : 'rgba(244, 63, 94, 0.4)'
+                    }`,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RECOMMENDATION</div>
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 900,
+                          marginTop: 2,
+                          color:
+                            evaluationResult.decisionOutcome === 'BUY'
+                              ? 'var(--accent-emerald)'
+                              : evaluationResult.decisionOutcome === 'CONSIDER_WAITING'
+                              ? 'var(--accent-amber)'
+                              : 'var(--accent-rose)',
+                        }}
+                      >
+                        {evaluationResult.decisionOutcome === 'BUY'
+                          ? 'RECOMMENDED: BUY'
+                          : evaluationResult.decisionOutcome === 'CONSIDER_WAITING'
+                          ? 'CONSIDER WAITING'
+                          : 'AVOID FOR NOW'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Affordability Score</div>
+                      <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-main)' }}>
+                        {evaluationResult.affordabilityScore} <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>/ 100</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Key Financial Impact Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                  <div style={{ background: 'var(--bg-tertiary)', padding: 10, borderRadius: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Post-Purchase Balance</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4, color: evaluationResult.factors.postPurchaseBalance >= 0 ? 'var(--text-main)' : 'var(--accent-rose)' }}>
+                      {formatINR(evaluationResult.factors.postPurchaseBalance)}
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--bg-tertiary)', padding: 10, borderRadius: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Free Discretionary Cash</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4, color: evaluationResult.factors.postPurchaseFreeCash >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                      {formatINR(evaluationResult.factors.postPurchaseFreeCash)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Natural-Language Explanation */}
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent-purple)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={14} /> AI ADVISOR EXPLANATION
+                  </div>
+                  <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-main)', whiteSpace: 'pre-line' }}>
+                    {evaluationResult.explanation}
+                  </div>
+                </div>
+
+                {/* Feedback Widget */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-tertiary)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Was this advice helpful?</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => handleAdvisoryFeedback(evaluationResult.requestId, true)}
+                      style={{
+                        background: feedbackSent[evaluationResult.requestId] === true ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255,255,255,0.08)',
+                        border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                      }}
+                    >
+                      <ThumbsUp size={12} /> Yes
+                    </button>
+                    <button
+                      onClick={() => handleAdvisoryFeedback(evaluationResult.requestId, false)}
+                      style={{
+                        background: feedbackSent[evaluationResult.requestId] === false ? 'rgba(244, 63, 94, 0.4)' : 'rgba(255,255,255,0.08)',
+                        border: 'none', color: '#fff', fontSize: 11, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4
+                      }}
+                    >
+                      <ThumbsDown size={12} /> No
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
