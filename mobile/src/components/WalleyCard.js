@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Svg, {
   Defs,
@@ -8,12 +8,12 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { Wifi } from 'lucide-react-native';
+import { Wifi, Eye, EyeOff, RefreshCw } from 'lucide-react-native';
 import { formatCurrency } from '../theme';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 40;
-const CARD_HEIGHT = 200;
+const CARD_HEIGHT = 220;
 
 export default function WalleyCard({
   theme,
@@ -22,8 +22,14 @@ export default function WalleyCard({
   cardNumber = '**** **** 2880',
   expiry = '11/24',
   variant = 'blue', // 'blue' | 'cyan' | 'purple' | 'dark'
+  accountName = 'Primary Account',
+  institutionName = 'Citi Bank',
+  accountType = 'SAVINGS',
   onPress,
+  onViewAccounts,
+  onViewTransactions,
 }) {
+  const [balanceHidden, setBalanceHidden] = useState(false);
   const gradientConfigs = {
     blue: {
       from: '#4361EE',
@@ -59,12 +65,12 @@ export default function WalleyCard({
       onPress={onPress}
       style={[styles.cardContainer, theme.floatingShadow]}
     >
-      {/* Background SVG with smooth gradients & decorative curves */}
+      {/* Background SVG — rendered first, sits at z=0 */}
       <Svg
         width={CARD_WIDTH}
         height={CARD_HEIGHT}
         viewBox={`0 0 ${CARD_WIDTH} ${CARD_HEIGHT}`}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, { zIndex: 0 }]}
       >
         <Defs>
           <LinearGradient id={`cardGrad-${variant}`} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -93,47 +99,54 @@ export default function WalleyCard({
         />
       </Svg>
 
-      {/* Card Content Overlay */}
+      {/* Card Content Overlay — absolutely positioned on top at z=1 */}
       <View style={styles.cardContent}>
-        {/* Top Card Row: Name, Chip & Contactless */}
+        {/* Top Row: Account Type/Institution + Eye toggle */}
         <View style={styles.topRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.accountTypeLabel}>
+              {accountType.replace(/_/g, ' ')} • {institutionName}
+            </Text>
+            <Text style={styles.cardHolderName}>{accountName}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setBalanceHidden((v) => !v)}
+            style={styles.eyeBtn}
+            activeOpacity={0.7}
+          >
+            {balanceHidden
+              ? <EyeOff size={18} color="rgba(255,255,255,0.85)" />
+              : <Eye size={18} color="rgba(255,255,255,0.85)" />
+            }
+          </TouchableOpacity>
+        </View>
+
+        {/* Middle: Combined Balance + refresh */}
+        <View style={styles.balanceRow}>
           <View>
-            <Text style={styles.cardHolderLabel}>Name</Text>
-            <Text style={styles.cardHolderName}>{cardHolder}</Text>
+            <Text style={styles.balanceLabel}>Combined Balance</Text>
+            <Text style={styles.balanceAmount}>
+              {balanceHidden ? '••••••' : formatCurrency(balance)}
+            </Text>
           </View>
-          <View style={styles.chipRow}>
-            {/* Contactless waves */}
-            <Wifi size={18} color="rgba(255, 255, 255, 0.85)" style={{ transform: [{ rotate: '90deg' }] }} />
-            {/* Realistic EMV Card Chip */}
-            <View style={styles.chip}>
-              <View style={styles.chipInner} />
-            </View>
-          </View>
+          <TouchableOpacity style={styles.refreshBtn} activeOpacity={0.7} onPress={onPress}>
+            <RefreshCw size={20} color="rgba(255,255,255,0.75)" />
+          </TouchableOpacity>
         </View>
 
-        {/* Card Number */}
-        <View style={styles.numberRow}>
-          <Text style={styles.cardNumber}>{cardNumber}</Text>
-        </View>
+        {/* Divider */}
+        <View style={styles.dividerLine} />
 
-        {/* Bottom Card Row: Balance & Expiry & Mastercard Circles */}
+        {/* Bottom Row: View Accounts + Transactions links */}
         <View style={styles.bottomRow}>
-          <View>
-            <Text style={styles.balanceLabel}>Balance</Text>
-            <Text style={styles.balanceAmount}>{formatCurrency(balance)}</Text>
-          </View>
-
-          <View style={styles.rightBottom}>
-            <View style={styles.expiryBox}>
-              <Text style={styles.expiryLabel}>EXP</Text>
-              <Text style={styles.expiryValue}>{expiry}</Text>
-            </View>
-            {/* Mastercard overlapping rings logo */}
-            <View style={styles.mastercardLogo}>
-              <View style={[styles.mcCircle, { backgroundColor: 'rgba(235, 0, 27, 0.88)' }]} />
-              <View style={[styles.mcCircle, { backgroundColor: 'rgba(247, 158, 27, 0.88)', marginLeft: -10 }]} />
-            </View>
-          </View>
+          <TouchableOpacity onPress={onViewAccounts} activeOpacity={0.75}>
+            <Text style={styles.cardLink}>View Accounts</Text>
+            <View style={styles.linkUnderline} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onViewTransactions} activeOpacity={0.75}>
+            <Text style={styles.cardLink}>Transactions</Text>
+            <View style={styles.linkUnderline} />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -150,103 +163,76 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardContent: {
-    flex: 1,
-    padding: 22,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 20,
     justifyContent: 'space-between',
+    zIndex: 1,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  cardHolderLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  accountTypeLabel: {
+    color: 'rgba(255, 255, 255, 0.72)',
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    marginBottom: 2,
   },
   cardHolderName: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  eyeBtn: {
+    padding: 4,
     marginTop: 2,
   },
-  chipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  chip: {
-    width: 34,
-    height: 26,
-    borderRadius: 5,
-    backgroundColor: '#E5C07B',
-    borderWidth: 1,
-    borderColor: '#D4AF37',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chipInner: {
-    width: 22,
-    height: 16,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#B8860B',
-  },
-  numberRow: {
-    marginVertical: 4,
-  },
-  cardNumber: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 2.5,
-  },
-  bottomRow: {
+  balanceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },
   balanceLabel: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 12,
     fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   balanceAmount: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '800',
-    letterSpacing: -0.3,
-    marginTop: 2,
+    letterSpacing: -0.5,
   },
-  rightBottom: {
+  refreshBtn: {
+    padding: 6,
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginVertical: 2,
+  },
+  bottomRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 14,
   },
-  expiryBox: {
-    alignItems: 'flex-end',
-  },
-  expiryLabel: {
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  expiryValue: {
+  cardLink: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
+    marginBottom: 2,
   },
-  mastercardLogo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  mcCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  linkUnderline: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
   },
 });

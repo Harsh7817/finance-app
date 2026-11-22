@@ -18,11 +18,10 @@ import {
   Coins,
   Plus,
   Check,
-  ArrowRight,
   ShieldCheck,
   Building2,
   X,
-  Sparkles,
+  LogOut,
 } from 'lucide-react-native';
 import WalleyLogo from '../components/WalleyLogo';
 import { formatCurrency } from '../theme';
@@ -173,14 +172,6 @@ export default function AccountSelectionScreen({
     }
   };
 
-  const handleContinue = () => {
-    const selected = accounts.find((a) => a.id === selectedAccountId);
-    if (!selected) {
-      return Alert.alert('Select Account', 'Please choose an account to proceed to your dashboard.');
-    }
-    onSelectAccount(selected);
-  };
-
   const getAccountIcon = (type) => {
     switch (type) {
       case 'CREDIT_CARD':
@@ -247,14 +238,6 @@ export default function AccountSelectionScreen({
                 <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
                   Your Accounts ({accounts.length})
                 </Text>
-                <TouchableOpacity
-                  style={[styles.addInlineBtn, { backgroundColor: theme.primarySoft }]}
-                  onPress={() => setShowAddModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Plus size={14} color={theme.primary} strokeWidth={2.6} />
-                  <Text style={[styles.addInlineBtnText, { color: theme.primary }]}>Add Account</Text>
-                </TouchableOpacity>
               </View>
 
               {accounts.length === 0 ? (
@@ -300,7 +283,10 @@ export default function AccountSelectionScreen({
                           },
                           isSelected ? theme.cardShadow : theme.cardShadowSoft,
                         ]}
-                        onPress={() => setSelectedAccountId(acc.id)}
+                        onPress={() => {
+                          setSelectedAccountId(acc.id);
+                          onSelectAccount(acc);
+                        }}
                         activeOpacity={0.88}
                       >
                         {/* Left Icon */}
@@ -420,7 +406,7 @@ export default function AccountSelectionScreen({
         )}
       </ScrollView>
 
-      {/* Bottom Sticky Action Bar */}
+      {/* Bottom Sticky Action Bar — Logout only */}
       <View
         style={[
           styles.bottomActionBar,
@@ -432,29 +418,13 @@ export default function AccountSelectionScreen({
         ]}
       >
         <TouchableOpacity
-          style={[
-            styles.continueBtn,
-            { backgroundColor: theme.primary },
-            !selectedAccountId && { opacity: 0.5 },
-            theme.floatingShadow,
-          ]}
-          onPress={handleContinue}
-          disabled={!selectedAccountId}
-          activeOpacity={0.88}
+          style={[styles.logoutBtn, { borderColor: theme.border }]}
+          onPress={onLogout}
+          activeOpacity={0.8}
         >
-          <Text style={styles.continueBtnText}>
-            Continue to Dashboard
-          </Text>
-          <ArrowRight size={18} color="#FFFFFF" strokeWidth={2.6} />
+          <LogOut size={18} color="#EF4444" strokeWidth={2.4} />
+          <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
-
-        {onLogout && (
-          <TouchableOpacity style={styles.switchUserBtn} onPress={onLogout}>
-            <Text style={[styles.switchUserText, { color: theme.textMuted }]}>
-              Sign out or switch user
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Add Account Modal */}
@@ -684,18 +654,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.2,
   },
-  addInlineBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  addInlineBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   accountsList: {
     gap: 12,
   },
@@ -831,26 +789,20 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 28 : 16,
     gap: 8,
   },
-  continueBtn: {
+  logoutBtn: {
     height: 52,
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 10,
+    borderWidth: 1,
+    backgroundColor: '#FEF2F2',
   },
-  continueBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  logoutBtnText: {
+    color: '#EF4444',
+    fontSize: 15,
     fontWeight: '800',
-  },
-  switchUserBtn: {
-    alignSelf: 'center',
-    paddingVertical: 4,
-  },
-  switchUserText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
