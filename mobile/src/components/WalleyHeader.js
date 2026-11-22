@@ -1,33 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Bell, Sun, Moon, Wifi } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Bell, Sun, Moon, RefreshCw, UserRound } from 'lucide-react-native';
 
 export default function WalleyHeader({
   theme,
   isDark,
   onToggleTheme,
-  userName = 'Arya Wijaya',
-  onPressProfile,
   onPressNotifications,
+  onSwitchAccount,
+  selectedAccount = null,
 }) {
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.profileGroup}
-        onPress={onPressProfile}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.avatarWrapper, { borderColor: theme.primaryLight }]}>
-          {/* Stylized Avatar */}
-          <View style={[styles.avatarCircle, { backgroundColor: theme.primarySoft }]}>
-            <Text style={[styles.avatarInitials, { color: theme.primary }]}>AW</Text>
-          </View>
-        </View>
-        <View style={styles.textGroup}>
-          <Text style={[styles.greeting, { color: theme.textMuted }]}>Good Morning</Text>
-          <Text style={[styles.userName, { color: theme.textPrimary }]}>{userName}</Text>
-        </View>
-      </TouchableOpacity>
+      {/* Left: Walley wordmark */}
+      <Text style={[styles.brandText, { color: theme.textPrimary }]}>Walley</Text>
 
       <View style={styles.actionsGroup}>
         {/* Dark/Light Mode Switcher */}
@@ -52,6 +38,22 @@ export default function WalleyHeader({
           <Bell size={18} color={theme.textPrimary} />
           <View style={[styles.badgeDot, { backgroundColor: theme.primary }]} />
         </TouchableOpacity>
+
+        {/* Switch Account — person inside circular arrows */}
+        <TouchableOpacity
+          style={[styles.iconBtn, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
+          onPress={onSwitchAccount}
+          activeOpacity={0.7}
+        >
+          {/* Circular arrows ring */}
+          <View style={styles.switchIconWrap}>
+            <RefreshCw size={34} color={theme.textPrimary} strokeWidth={1.6} style={styles.switchRing} />
+            {/* Person icon centered inside the ring */}
+            <View style={styles.switchPersonCenter}>
+              <UserRound size={14} color={theme.textPrimary} strokeWidth={2} />
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -66,43 +68,10 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
   },
-  profileGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarWrapper: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 2,
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarCircle: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarInitials: {
-    fontSize: 16,
+  brandText: {
+    fontSize: 22,
     fontWeight: '800',
-  },
-  textGroup: {
-    justifyContent: 'center',
-  },
-  greeting: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   actionsGroup: {
     flexDirection: 'row',
@@ -125,5 +94,20 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  switchIconWrap: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  switchRing: {
+    position: 'absolute',
+  },
+  switchPersonCenter: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

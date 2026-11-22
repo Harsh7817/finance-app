@@ -34,6 +34,7 @@ import AuthScreen from './src/screens/AuthScreen';
 import AccountSelectionScreen from './src/screens/AccountSelectionScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import StatisticScreen from './src/screens/StatisticScreen';
+import AccountDetailsScreen from './src/screens/AccountDetailsScreen';
 import WalletScreen from './src/screens/WalletScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import TransferScreen from './src/screens/TransferScreen';
@@ -492,6 +493,21 @@ export default function App() {
             onBack={() => navigateTo('wallet')}
             onCardSaved={() => {
               navigateTo('wallet');
+            }}
+          />
+        )}
+
+        {currentScreen === 'accountDetails' && (
+          <AccountDetailsScreen
+            theme={theme}
+            userName={userProfile.name}
+            selectedAccount={selectedAccount}
+            accounts={accounts}
+            onBack={() => navigateTo('home')}
+            onAddAccount={() => navigateTo('selectAccount')}
+            onSelectAccount={(acc) => {
+              setSelectedAccount(acc);
+              navigateTo('home');
             }}
           />
         )}

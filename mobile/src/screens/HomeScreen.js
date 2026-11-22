@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   TrendingUp,
-  CreditCard,
   ChevronRight,
-  ChevronDown,
   Zap,
   ShoppingBag,
   Coffee,
   DollarSign,
-  Landmark,
 } from 'lucide-react-native';
 import WalleyHeader from '../components/WalleyHeader';
 import WalleyCard from '../components/WalleyCard';
@@ -39,25 +36,9 @@ export default function HomeScreen({
   onRefresh,
   refreshing = false,
 }) {
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
-
   const displayBalance = selectedAccount?.cachedBalance !== undefined
     ? Number(selectedAccount.cachedBalance)
     : balance;
-
-  const cards = [
-    {
-      id: selectedAccount?.id || 'c1',
-      variant: 'blue',
-      name: userName,
-      number: selectedAccount?.accountMask || '**** **** 2880',
-      balance: displayBalance,
-      expiry: '11/24',
-      institution: selectedAccount?.institutionName || 'Citi Bank',
-    },
-    { id: 'c2', variant: 'cyan', name: userName, number: '**** **** 9421', balance: 3450.0, expiry: '08/27', institution: 'HDFC Bank' },
-    { id: 'c3', variant: 'purple', name: userName, number: '**** **** 5133', balance: 7890.5, expiry: '03/28', institution: 'Chase' },
-  ];
 
   // Default Walley demo transactions matching design
   const defaultActivity = [
@@ -103,17 +84,15 @@ export default function HomeScreen({
     },
   ];
 
-  const currentCard = cards[activeCardIndex];
-
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <WalleyHeader
         theme={theme}
         isDark={isDark}
         onToggleTheme={onToggleTheme}
-        userName={userName}
-        onPressProfile={() => onNavigate('profile')}
         onPressNotifications={() => onNavigate('statistic')}
+        onSwitchAccount={onSwitchAccount}
+        selectedAccount={selectedAccount}
       />
 
       <ScrollView
@@ -121,65 +100,20 @@ export default function HomeScreen({
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
       >
-        {/* Active Account Switcher Pill */}
-        {selectedAccount && onSwitchAccount && (
-          <View style={styles.accountBarRow}>
-            <TouchableOpacity
-              style={[
-                styles.accountPill,
-                {
-                  backgroundColor: theme.surface,
-                  borderColor: theme.border,
-                },
-                theme.cardShadowSoft,
-              ]}
-              onPress={onSwitchAccount}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.pillIconDot, { backgroundColor: theme.primarySoft }]}>
-                <Landmark size={14} color={theme.primary} />
-              </View>
-              <Text style={[styles.pillText, { color: theme.textPrimary }]} numberOfLines={1}>
-                {selectedAccount.institutionName} • {selectedAccount.accountName}
-              </Text>
-              <View style={styles.switchBadge}>
-                <Text style={[styles.switchBadgeText, { color: theme.primary }]}>Switch</Text>
-                <ChevronDown size={14} color={theme.primary} />
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Card Component */}
+        {/* Single WalleyCard for selected account */}
         <WalleyCard
           theme={theme}
-          balance={currentCard.balance}
-          cardHolder={currentCard.name}
-          cardNumber={currentCard.number}
-          expiry={currentCard.expiry}
-          variant={currentCard.variant}
-          onPress={() => {
-            // Cycle through cards on tap
-            setActiveCardIndex((prev) => (prev + 1) % cards.length);
-          }}
+          balance={displayBalance}
+          cardHolder={userName}
+          cardNumber={selectedAccount?.accountMask || '**** **** 2880'}
+          expiry="11/24"
+          variant="blue"
+          accountName={selectedAccount?.accountName || 'Primary Account'}
+          institutionName={selectedAccount?.institutionName || 'Citi Bank'}
+          accountType={selectedAccount?.accountType || 'SAVINGS'}
+          onViewAccounts={() => onNavigate('accountDetails')}
+          onViewTransactions={() => onNavigate('statistic')}
         />
-
-        {/* Card Dots Indicator */}
-        <View style={styles.dotsRow}>
-          {cards.map((c, idx) => (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => setActiveCardIndex(idx)}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: idx === activeCardIndex ? theme.primary : theme.border,
-                  width: idx === activeCardIndex ? 22 : 8,
-                },
-              ]}
-            />
-          ))}
-        </View>
 
         {/* Featured Actions Grid (Transfer, Request, Top Up, Bill) */}
         <FeaturedActions
@@ -289,56 +223,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 28,
-  },
-  accountBarRow: {
-    paddingHorizontal: 20,
-    marginBottom: 6,
-  },
-  accountPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 10,
-  },
-  pillIconDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pillText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  switchBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(67, 97, 238, 0.08)',
-  },
-  switchBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
   },
   promoBanner: {
     marginHorizontal: 20,
