@@ -1,0 +1,123 @@
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+
+// In Android emulator: 10.0.2.2 points to localhost. On physical phone: LAN IP or configurable IP.
+// 172.20.249.127 is your current active Wi-Fi IP.
+export const DEFAULT_API_HOST = Platform.OS === 'android' ? '172.20.249.127' : 'localhost';
+export const API_PORT = '3000';
+
+let dynamicHost = DEFAULT_API_HOST;
+
+export const setApiHost = (host) => {
+  dynamicHost = host.trim();
+};
+
+export const getApiBaseUrl = () => `http://${dynamicHost}:${API_PORT}/api/v1`;
+
+const TOKEN_KEY = 'finance_jwt_token';
+
+export const saveToken = async (token) => {
+  try {
+    await SecureStore.setItemAsync(TOKEN_KEY, token);
+  } catch {
+    // Fallback if secure store is unavailable
+  }
+};
+
+export const getToken = async () => {
+  try {
+    return await SecureStore.getItemAsync(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const deleteToken = async () => {
+  try {
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+};
+
+async function apiRequest(endpoint, options = {}) {
+  const token = await getToken();
+  const headers = {
+    ...(options.headers || {}),
+  };
+
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const url = `${getApiBaseUrl()}${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  let json;
+  try {
+    json = await response.json();
+  } catch {
+    json = { message: `Request failed with status ${response.status}` };
+  }
+
+  if (!response.ok) {
+    const errorMsg = json.message || (Array.isArray(json.errors) ? json.errors.join(', ') : json.errors) || 'API Request failed';
+    throw new Error(errorMsg);
+  }
+
+  return json.data;
+}
+
+export const api = {
+  // Auth
+  register: (email, password) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  login: (email, password) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  getMe: () => apiRequest('/auth/me'),
+
+  // Profile
+  getProfile: () => apiRequest('/profile'),
+  updateProfile: (data) => apiRequest('/profile', { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // Accounts & Data Sources
+  getAccounts: () => apiRequest('/financial/accounts'),
+  createAccount: (data) => apiRequest('/financial/accounts', { method: 'POST', body: JSON.stringify(data) }),
+  getDataSources: () => apiRequest('/financial/sources'),
+  createDataSource: (data) => apiRequest('/financial/sources', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Transactions
+  getTransactions: (queryString = '') => apiRequest(`/transactions${queryString}`),
+  createTransaction: (data) => apiRequest('/transactions', { method: 'POST', body: JSON.stringify(data) }),
+  getCategories: () => apiRequest('/categories'),
+
+  // CSV Statement Ingestion
+  uploadCsv: (formData) => apiRequest('/imports/csv', { method: 'POST', body: formData }),
+
+  // Analytics (Phase 6)
+  getOverview: (timeframe = 'month') => apiRequest(`/analytics/overview?timeframe=${timeframe}`),
+  getExpenses: (timeframe = 'month') => apiRequest(`/analytics/expenses?timeframe=${timeframe}`),
+  getVisualizations: (timeframe = 'month') => apiRequest(`/analytics/visualizations?timeframe=${timeframe}`),
+
+  // Budgets (Phase 7)
+  getBudgets: () => apiRequest('/budgets'),
+  createBudget: (data) => apiRequest('/budgets', { method: 'POST', body: JSON.stringify(data) }),
+  getBudgetAlerts: () => apiRequest('/budgets/alerts'),
+
+  // Goals (Phase 8)
+  getGoals: () => apiRequest('/goals'),
+  createGoal: (data) => apiRequest('/goals', { method: 'POST', body: JSON.stringify(data) }),
+  addContribution: (goalId, data) => apiRequest(`/goals/${goalId}/contributions`, { method: 'POST', body: JSON.stringify(data) }),
+
+  // Recurring (Phase 9)
+  getRecurring: () => apiRequest('/recurring'),
+  createRecurring: (data) => apiRequest('/recurring', { method: 'POST', body: JSON.stringify(data) }),
+  detectRecurring: () => apiRequest('/recurring/detect', { method: 'POST', body: JSON.stringify({ lookbackDays: 90 }) }),
+  getRecurringAlerts: () => apiRequest('/recurring/alerts'),
+};
+
