@@ -1,20 +1,29 @@
+import { walleyTheme, formatCurrency, formatShortCurrency } from './theme';
+
+export { walleyTheme, formatCurrency, formatShortCurrency };
+
 export const colors = {
-  bgPrimary: '#0B0E14',
-  bgSecondary: '#151922',
-  bgTertiary: '#1E2330',
-  accentPrimary: '#3B82F6',
-  accentEmerald: '#10B981',
-  accentRose: '#F43F5E',
-  accentAmber: '#F59E0B',
-  accentPurple: '#8B5CF6',
-  textMain: '#F8FAFC',
-  textMuted: '#94A3B8',
-  textDim: '#64748B',
-  borderColor: 'rgba(255, 255, 255, 0.08)',
+  // Walley Light Defaults
+  primary: walleyTheme.light.primary,
+  primaryDark: walleyTheme.light.primaryDark,
+  primaryLight: walleyTheme.light.primaryLight,
+  primarySoft: walleyTheme.light.primarySoft,
+  
+  bgPrimary: walleyTheme.light.bg,
+  bgSecondary: walleyTheme.light.bgSecondary,
+  bgTertiary: walleyTheme.light.surfaceAlt,
+  
+  textMain: walleyTheme.light.textPrimary,
+  textMuted: walleyTheme.light.textMuted,
+  textDim: walleyTheme.light.textDim,
+  borderColor: walleyTheme.light.border,
+  
+  accentPrimary: walleyTheme.light.primary,
+  accentEmerald: walleyTheme.light.accentEmerald,
+  accentRose: walleyTheme.light.accentRose,
+  accentAmber: walleyTheme.light.accentAmber,
+  accentPurple: walleyTheme.light.accentPurple,
+  accentCyan: walleyTheme.light.accentCyan,
 };
 
-export const formatINR = (amt) => {
-  const num = parseFloat(amt || 0);
-  return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
-};
-
+export const formatINR = (amt) => formatCurrency(amt, 'USD');
