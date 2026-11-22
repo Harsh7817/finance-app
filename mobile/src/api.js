@@ -1,9 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// In Android emulator: 10.0.2.2 points to localhost. On physical phone: LAN IP or configurable IP.
-// 172.20.249.127 is your current active Wi-Fi IP.
-export const DEFAULT_API_HOST = Platform.OS === 'android' ? '172.20.249.127' : 'localhost';
+// Current active PC Wi-Fi IP is 172.20.249.4.
+// For Android Emulator, use '10.0.2.2'.
+// For Web or iOS Simulator, use 'localhost'.
+export const DEFAULT_API_HOST = Platform.OS === 'android' ? '172.20.249.4' : 'localhost';
 export const API_PORT = '3000';
 
 let dynamicHost = DEFAULT_API_HOST;
@@ -11,6 +12,8 @@ let dynamicHost = DEFAULT_API_HOST;
 export const setApiHost = (host) => {
   dynamicHost = host.trim();
 };
+
+export const getApiHost = () => dynamicHost;
 
 export const getApiBaseUrl = () => `http://${dynamicHost}:${API_PORT}/api/v1`;
 
@@ -40,6 +43,20 @@ export const deleteToken = async () => {
   }
 };
 
+export async function checkServerHealth() {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(`http://${dynamicHost}:${API_PORT}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function apiRequest(endpoint, options = {}) {
   const token = await getToken();
   const headers = {
@@ -55,10 +72,27 @@ async function apiRequest(endpoint, options = {}) {
   }
 
   const url = `${getApiBaseUrl()}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+
+  // 4.5-second timeout to prevent hanging on unreachable IPs
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Connection timeout: Could not reach backend server at ${url}.`);
+    }
+    throw new Error(`Network error: Could not reach server at ${url}. Check server status or switch to Demo Mode.`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let json;
   try {
@@ -68,7 +102,7 @@ async function apiRequest(endpoint, options = {}) {
   }
 
   if (!response.ok) {
-    const errorMsg = json.message || (Array.isArray(json.errors) ? json.errors.join(', ') : json.errors) || 'API Request failed';
+    const errorMsg = json.message || (Array.isArray(json.errors) ? json.errors.join(', ') : json.errors) || `Request failed with status ${response.status}`;
     throw new Error(errorMsg);
   }
 
@@ -99,25 +133,24 @@ export const api = {
   // CSV Statement Ingestion
   uploadCsv: (formData) => apiRequest('/imports/csv', { method: 'POST', body: formData }),
 
-  // Analytics (Phase 6)
+  // Analytics
   getOverview: (timeframe = 'month') => apiRequest(`/analytics/overview?timeframe=${timeframe}`),
   getExpenses: (timeframe = 'month') => apiRequest(`/analytics/expenses?timeframe=${timeframe}`),
   getVisualizations: (timeframe = 'month') => apiRequest(`/analytics/visualizations?timeframe=${timeframe}`),
 
-  // Budgets (Phase 7)
+  // Budgets
   getBudgets: () => apiRequest('/budgets'),
   createBudget: (data) => apiRequest('/budgets', { method: 'POST', body: JSON.stringify(data) }),
   getBudgetAlerts: () => apiRequest('/budgets/alerts'),
 
-  // Goals (Phase 8)
+  // Goals
   getGoals: () => apiRequest('/goals'),
   createGoal: (data) => apiRequest('/goals', { method: 'POST', body: JSON.stringify(data) }),
   addContribution: (goalId, data) => apiRequest(`/goals/${goalId}/contributions`, { method: 'POST', body: JSON.stringify(data) }),
 
-  // Recurring (Phase 9)
+  // Recurring
   getRecurring: () => apiRequest('/recurring'),
   createRecurring: (data) => apiRequest('/recurring', { method: 'POST', body: JSON.stringify(data) }),
   detectRecurring: () => apiRequest('/recurring/detect', { method: 'POST', body: JSON.stringify({ lookbackDays: 90 }) }),
   getRecurringAlerts: () => apiRequest('/recurring/alerts'),
 };
-
