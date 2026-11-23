@@ -51,10 +51,42 @@ export default function AccountSelectionScreen({
   const [institutionName, setInstitutionName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState('SAVINGS');
-  const [openingBalance, setOpeningBalance] = useState('1200.00');
+  const [openingBalance, setOpeningBalance] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [currency, setCurrency] = useState('INR');
+
+  // Input sanitization & constraints
+  const handleNameChange = (val) => {
+    // Only allow letters and spaces, max 50 chars
+    const clean = val.replace(/[^a-zA-Z\s]/g, '').slice(0, 50);
+    setAccountName(clean);
+  };
+
+  const handleAccountNumberChange = (val) => {
+    // Only allow digits, max 18 digits (standard 9-18 for bank accounts)
+    const clean = val.replace(/\D/g, '').slice(0, 18);
+    setAccountNumber(clean);
+  };
+
+  const handleBalanceChange = (val) => {
+    // Only allow numbers and at most one decimal point with 2 decimal places
+    let clean = val.replace(/[^0-9.]/g, '');
+    const parts = clean.split('.');
+    if (parts.length > 2) {
+      clean = parts[0] + '.' + parts.slice(1).join('');
+    }
+    if (parts[1] && parts[1].length > 2) {
+      clean = parts[0] + '.' + parts[1].slice(0, 2);
+    }
+    setOpeningBalance(clean);
+  };
+
+  const handleIfscChange = (val) => {
+    // Max 11 alphanumeric characters, uppercase
+    const clean = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11);
+    setIfscCode(clean);
+  };
 
   const banksList = [
     'State Bank of India (SBI)',
@@ -144,31 +176,70 @@ export default function AccountSelectionScreen({
   };
 
   const handleCreateAccount = async () => {
-    if (!accountName.trim()) {
+    // 1. Name constraint validation
+    const trimmedName = accountName.trim();
+    if (!trimmedName) {
       return Alert.alert('Required', 'Please enter the account holder name.');
     }
+    if (!/^[a-zA-Z\s]{2,50}$/.test(trimmedName)) {
+      return Alert.alert(
+        'Invalid Name',
+        'Account holder name must contain only letters and be between 2 and 50 characters.'
+      );
+    }
+
+    // 2. Bank selection validation
     if (!institutionName.trim()) {
-      return Alert.alert('Required', 'Please select a bank.');
+      return Alert.alert('Required', 'Please select a bank from the dropdown.');
+    }
+
+    // 3. Account number constraint validation
+    const trimmedAccNum = accountNumber.trim();
+    if (!trimmedAccNum) {
+      return Alert.alert('Required', 'Please enter the account number.');
+    }
+    if (!/^\d{9,18}$/.test(trimmedAccNum)) {
+      return Alert.alert(
+        'Invalid Account Number',
+        'Please enter a valid bank account number (9 to 18 digits).'
+      );
+    }
+
+    // 4. IFSC validation (if provided)
+    const trimmedIfsc = ifscCode.trim().toUpperCase();
+    if (trimmedIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(trimmedIfsc)) {
+      return Alert.alert(
+        'Invalid IFSC Code',
+        'Please enter a valid 11-character IFSC code (e.g. SBIN0001234 or HDFC0000060).'
+      );
+    }
+
+    // 5. Initial balance constraint validation
+    const trimmedBalance = openingBalance.trim();
+    let numericBalance = 0;
+    if (trimmedBalance !== '') {
+      numericBalance = parseFloat(trimmedBalance);
+      if (isNaN(numericBalance) || numericBalance < 0) {
+        return Alert.alert(
+          'Invalid Amount',
+          'Please enter a valid initial balance (e.g. 1000 or 1200.50).'
+        );
+      }
     }
 
     setCreating(true);
     try {
-      const trimmedAccNum = accountNumber.trim();
-      const generatedMask = trimmedAccNum.length >= 4
-        ? `**** ${trimmedAccNum.slice(-4)}`
-        : ifscCode.trim()
-        ? `**** ${ifscCode.trim().slice(-4)}`
-        : '**** 2880';
+      const generatedMask = `**** ${trimmedAccNum.slice(-4)}`;
 
       const payload = {
-        accountName: accountName.trim(),
+        accountName: trimmedName,
         institutionName: institutionName.trim(),
         accountType: accountType,
-        openingBalance: parseFloat(openingBalance) || 0,
+        openingBalance: numericBalance,
         accountNumber: trimmedAccNum,
         accountMask: generatedMask,
         currency: currency,
-        ifscCode: ifscCode.trim().toUpperCase(),
+        ifscCode: trimmedIfsc,
       };
 
       let newAccount;
@@ -590,10 +661,12 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder=""
+                  placeholder="Enter Name"
                   placeholderTextColor={theme.textDim}
+                  autoCapitalize="words"
+                  maxLength={50}
                   value={accountName}
-                  onChangeText={setAccountName}
+                  onChangeText={handleNameChange}
                 />
               </View>
 
@@ -620,7 +693,7 @@ export default function AccountSelectionScreen({
                     {institutionName || 'Select Bank'}
                   </Text>
                   {showBankDropdown ? (
-                    <ChevronUp size={18} color={theme.primary} />
+                     <ChevronUp size={18} color={theme.primary} />
                   ) : (
                     <ChevronDown size={18} color={theme.textMuted} />
                   )}
@@ -683,11 +756,12 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="e.g. 501004380274"
+                  placeholder="Enter Account Number"
                   placeholderTextColor={theme.textDim}
                   keyboardType="numeric"
+                  maxLength={18}
                   value={accountNumber}
-                  onChangeText={setAccountNumber}
+                  onChangeText={handleAccountNumberChange}
                 />
               </View>
 
@@ -699,12 +773,12 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="e.g. SBIN0001234"
+                  placeholder="Enter IFSC Code"
                   placeholderTextColor={theme.textDim}
                   autoCapitalize="characters"
                   maxLength={11}
                   value={ifscCode}
-                  onChangeText={(t) => setIfscCode(t.toUpperCase())}
+                  onChangeText={handleIfscChange}
                 />
               </View>
 
@@ -716,11 +790,11 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder=""
+                  placeholder="Enter Amount"
                   placeholderTextColor={theme.textDim}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   value={openingBalance}
-                  onChangeText={setOpeningBalance}
+                  onChangeText={handleBalanceChange}
                 />
               </View>
             </ScrollView>
