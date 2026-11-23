@@ -230,7 +230,15 @@ const createFinancialAccount = async (userId, accountData) => {
     accountMask,
     currency = 'INR',
     openingBalance = 0.00,
+    accountNumber,
+    ifscCode,
   } = accountData;
+
+  const cleanAccountNumber = accountNumber ? String(accountNumber).trim() : null;
+  const cleanIfsc = ifscCode ? String(ifscCode).trim().toUpperCase() : null;
+  const generatedMask = cleanAccountNumber && cleanAccountNumber.length >= 4
+    ? `**** ${cleanAccountNumber.slice(-4)}`
+    : (accountMask || (cleanIfsc ? `**** ${cleanIfsc.slice(-4)}` : null));
 
   return await prisma.$transaction(async (tx) => {
     const account = await tx.financialAccount.create({
@@ -239,7 +247,7 @@ const createFinancialAccount = async (userId, accountData) => {
         accountName,
         accountType: VALID_ACCOUNT_TYPES.includes(accountType) ? accountType : 'SAVINGS',
         institutionName,
-        accountMask: accountMask || null,
+        accountMask: generatedMask,
         currency: currency.toUpperCase(),
         cachedBalance: Number(openingBalance),
       },
@@ -259,7 +267,27 @@ const createFinancialAccount = async (userId, accountData) => {
       });
     }
 
-    return account;
+    // Provision a DataSource storing extra metadata (accountNumber, ifscCode, etc.)
+    await tx.dataSource.create({
+      data: {
+        userId,
+        accountId: account.id,
+        sourceType: 'MANUAL_INPUT',
+        providerName: institutionName,
+        metadata: {
+          accountNumber: cleanAccountNumber,
+          ifscCode: cleanIfsc,
+          accountHolderName: accountName,
+          openingBalance: Number(openingBalance),
+        },
+      },
+    });
+
+    return {
+      ...account,
+      accountNumber: cleanAccountNumber,
+      ifscCode: cleanIfsc,
+    };
   });
 };
 
@@ -269,7 +297,7 @@ const createFinancialAccount = async (userId, accountData) => {
  * @param {string} userId
  */
 const getUserAccounts = async (userId) => {
-  return await prisma.financialAccount.findMany({
+  const accounts = await prisma.financialAccount.findMany({
     where: { userId, deletedAt: null },
     include: {
       dataSources: {
@@ -278,6 +306,7 @@ const getUserAccounts = async (userId) => {
           sourceType: true,
           providerName: true,
           isActive: true,
+          metadata: true,
         },
       },
       _count: {
@@ -287,6 +316,30 @@ const getUserAccounts = async (userId) => {
       },
     },
     orderBy: { createdAt: 'desc' },
+  });
+
+  return accounts.map((acc) => {
+    let accountNumber = null;
+    let ifscCode = null;
+
+    if (Array.isArray(acc.dataSources)) {
+      for (const ds of acc.dataSources) {
+        if (ds.metadata && typeof ds.metadata === 'object') {
+          if (!accountNumber && ds.metadata.accountNumber) {
+            accountNumber = ds.metadata.accountNumber;
+          }
+          if (!ifscCode && ds.metadata.ifscCode) {
+            ifscCode = ds.metadata.ifscCode;
+          }
+        }
+      }
+    }
+
+    return {
+      ...acc,
+      accountNumber: accountNumber || null,
+      ifscCode: ifscCode || null,
+    };
   });
 };
 

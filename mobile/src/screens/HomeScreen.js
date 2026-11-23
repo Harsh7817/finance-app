@@ -120,8 +120,8 @@ export default function HomeScreen({
         <WalleyCard
           theme={theme}
           balance={displayBalance}
-          cardHolder={userName}
-          cardNumber={selectedAccount?.accountMask || '**** **** 2880'}
+          cardHolder={selectedAccount?.accountName || userName}
+          cardNumber={selectedAccount?.accountNumber || selectedAccount?.accountMask || '**** **** 2880'}
           expiry="11/24"
           variant="blue"
           accountName={selectedAccount?.accountName || 'Primary Account'}

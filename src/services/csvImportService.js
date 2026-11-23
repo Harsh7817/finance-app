@@ -148,9 +148,20 @@ const processCsvImport = async (userId, sourceId, fileBuffer, originalFileName) 
   });
 
   if (existingFileBatch && existingFileBatch.status === 'COMPLETED') {
-    const error = new Error('This file has already been imported previously');
-    error.statusCode = 409;
-    throw error;
+    return {
+      batchId: existingFileBatch.id,
+      status: 'COMPLETED',
+      totalRecords: existingFileBatch.totalRecords,
+      parsedRecords: existingFileBatch.parsedRecords,
+      duplicateRecords: existingFileBatch.duplicateRecords,
+      failedRecords: existingFileBatch.failedRecords,
+      account: {
+        id: dataSource.account.id,
+        name: dataSource.account.accountName,
+      },
+      message: 'This statement file was already processed. Existing records retained.',
+      errorSummary: [],
+    };
   }
 
   // 3. Parse CSV rows

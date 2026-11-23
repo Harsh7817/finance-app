@@ -182,30 +182,33 @@ export default function WalletScreen({
         {/* Connected Bank Accounts */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Bank Accounts</Text>
-          {(accounts && accounts.length > 0 ? accounts : [
-            { id: 'b1', institutionName: 'HDFC Bank', accountName: 'Salary Account', cachedBalance: 25400 },
-            { id: 'b2', institutionName: 'Citi Bank', accountName: 'Savings Plus', cachedBalance: 12500 },
-          ]).map((acc) => (
-            <View
-              key={acc.id}
-              style={[
-                styles.accountRow,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                theme.cardShadowSoft,
-              ]}
-            >
-              <View style={[styles.accIconBox, { backgroundColor: theme.primarySoft }]}>
-                <CreditCard size={20} color={theme.primary} />
+          {accounts && accounts.length > 0 ? (
+            accounts.map((acc) => (
+              <View
+                key={acc.id}
+                style={[
+                  styles.accountRow,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                  theme.cardShadowSoft,
+                ]}
+              >
+                <View style={[styles.accIconBox, { backgroundColor: theme.primarySoft }]}>
+                  <CreditCard size={20} color={theme.primary} />
+                </View>
+                <View style={styles.accInfo}>
+                  <Text style={[styles.accInst, { color: theme.textPrimary }]}>{acc.institutionName}</Text>
+                  <Text style={[styles.accName, { color: theme.textMuted }]}>{acc.accountName}</Text>
+                </View>
+                <Text style={[styles.accBal, { color: theme.textPrimary }]}>
+                  {formatCurrency(acc.cachedBalance || 0)}
+                </Text>
               </View>
-              <View style={styles.accInfo}>
-                <Text style={[styles.accInst, { color: theme.textPrimary }]}>{acc.institutionName}</Text>
-                <Text style={[styles.accName, { color: theme.textMuted }]}>{acc.accountName}</Text>
-              </View>
-              <Text style={[styles.accBal, { color: theme.textPrimary }]}>
-                {formatCurrency(acc.cachedBalance)}
-              </Text>
+            ))
+          ) : (
+            <View style={[styles.accountRow, { backgroundColor: theme.surface, borderColor: theme.border, justifyContent: 'center', paddingVertical: 18 }]}>
+              <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '500' }}>No bank accounts linked yet</Text>
             </View>
-          ))}
+          )}
         </View>
       </ScrollView>
     </View>

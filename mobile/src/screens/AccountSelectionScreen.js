@@ -54,7 +54,7 @@ export default function AccountSelectionScreen({
   const [openingBalance, setOpeningBalance] = useState('1200.00');
   const [ifscCode, setIfscCode] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('INR');
 
   const banksList = [
     'State Bank of India (SBI)',
@@ -183,7 +183,14 @@ export default function AccountSelectionScreen({
         };
       }
 
-      const updatedList = [newAccount, ...accounts];
+      const mergedAccount = {
+        ...payload,
+        ...newAccount,
+        accountNumber: trimmedAccNum || newAccount?.accountNumber,
+        ifscCode: payload.ifscCode || newAccount?.ifscCode,
+      };
+
+      const updatedList = [mergedAccount, ...accounts];
       setAccounts(updatedList);
       setShowAddModal(false);
 

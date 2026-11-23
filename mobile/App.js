@@ -117,12 +117,29 @@ export default function App() {
       const [ov, accs, txs] = await Promise.all([
         api.getOverview().catch(() => null),
         api.getAccounts().catch(() => []),
-        api.getTransactions('?limit=20').catch(() => ({ transactions: [] })),
+        api.getTransactions('?limit=50').catch(() => []),
       ]);
 
       if (ov) setOverview(ov);
-      if (Array.isArray(accs) && accs.length > 0) setAccounts(accs);
-      if (txs?.transactions && txs.transactions.length > 0) setTransactions(txs.transactions);
+      if (Array.isArray(accs) && accs.length > 0) {
+        setAccounts(accs);
+        setSelectedAccount((prev) => {
+          if (!prev) return accs[0];
+          const fresh = accs.find((a) => a.id === prev.id);
+          return fresh || prev;
+        });
+        if (accs[0]?.accountName) {
+          setUserProfile((prev) => ({
+            ...prev,
+            name: accs[0].accountName,
+          }));
+        }
+      }
+
+      const txList = Array.isArray(txs)
+        ? txs
+        : (Array.isArray(txs?.items) ? txs.items : (Array.isArray(txs?.transactions) ? txs.transactions : []));
+      setTransactions(txList);
     } catch {
       // Offline mode safe fallback
     } finally {
@@ -156,6 +173,12 @@ export default function App() {
   // Called when user selects or creates an account
   const handleAccountSelected = (account) => {
     setSelectedAccount(account);
+    if (account?.accountName) {
+      setUserProfile((prev) => ({
+        ...prev,
+        name: account.accountName,
+      }));
+    }
     setCurrentScreen('importMethod');
   };
 
@@ -207,128 +230,85 @@ export default function App() {
   const handlePickCsv = async (onSuccess) => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', '*/*'],
+        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
         copyToCacheDirectory: true,
       });
 
-      if (res.canceled) return;
+      if (res.canceled || !res.assets || res.assets.length === 0) return;
       const file = res.assets[0];
 
       setLoading(true);
 
       let currentAccs = accounts;
       if (!currentAccs || currentAccs.length === 0) {
-        const newAcc = await api.createAccount({
-          accountName: selectedAccount?.accountName || 'Walley Primary Account',
-          accountType: 'SAVINGS',
-          institutionName: selectedAccount?.institutionName || 'Citi Bank',
-          currency: 'USD',
-          openingBalance: 1200.82,
-        }).catch(() => ({ id: 'default_acc' }));
-        currentAccs = [newAcc];
-        setAccounts(currentAccs);
+        const fetched = await api.getAccounts().catch(() => []);
+        if (fetched.length > 0) {
+          currentAccs = fetched;
+          setAccounts(fetched);
+        } else {
+          const newAcc = await api.createAccount({
+            accountName: userProfile.name || 'Primary Account',
+            accountType: 'SAVINGS',
+            institutionName: 'State Bank of India (SBI)',
+            currency: 'INR',
+            openingBalance: 0,
+          });
+          currentAccs = [newAcc];
+          setAccounts(currentAccs);
+        }
       }
 
+      const targetAccount = selectedAccount || currentAccs[0];
+
+      // Find or create CSV_STATEMENT dataSource linked to targetAccount
       let sources = await api.getDataSources().catch(() => []);
       let csvSource = Array.isArray(sources)
-        ? sources.find((s) => s.sourceType === 'CSV_STATEMENT' && s.isActive)
+        ? sources.find((s) => s.sourceType === 'CSV_STATEMENT' && s.isActive && s.accountId === targetAccount.id)
         : null;
 
       if (!csvSource) {
         csvSource = await api.createDataSource({
           sourceType: 'CSV_STATEMENT',
-          providerName: 'Mobile CSV Upload',
-          accountId: selectedAccount?.id || currentAccs[0].id,
-          currency: 'USD',
-        }).catch(() => ({ id: 'default_source' }));
+          providerName: `${targetAccount.institutionName || 'Bank'} Statement`,
+          accountId: targetAccount.id,
+          currency: targetAccount.currency || 'INR',
+        });
+      }
+
+      let fileName = file.name || 'statement.csv';
+      if (!fileName.toLowerCase().endsWith('.csv')) {
+        fileName = `${fileName}.csv`;
       }
 
       const formData = new FormData();
       formData.append('file', {
         uri: file.uri,
-        name: file.name,
+        name: fileName,
         type: file.mimeType || 'text/csv',
       });
       formData.append('sourceId', csvSource.id);
 
-      await api.uploadCsv(formData);
+      const importResult = await api.uploadCsv(formData);
+
+      await fetchDashboardData();
+
+      const parsedCount = importResult?.parsedRecords || importResult?.totalRecords || 'all';
       Alert.alert(
         'Import Complete',
-        'Transactions parsed and integrated into your Walley dashboard.',
+        `Successfully processed ${parsedCount} transactions from "${fileName}" into your account.`,
         [
           {
-            text: 'Go to Dashboard',
+            text: 'View Dashboard',
             onPress: () => {
               if (onSuccess) onSuccess();
             },
           },
         ]
       );
-      fetchDashboardData();
     } catch (err) {
-      // Simulation / offline fallback: load sample CSV transactions
-      const simulatedCsvTxs = [
-        {
-          id: 'csv_' + Date.now() + '_1',
-          merchantName: 'Apple Store Purchase',
-          category: 'Shopping & Electronics',
-          amount: 199.00,
-          type: 'DEBIT',
-          date: '22 Nov',
-        },
-        {
-          id: 'csv_' + Date.now() + '_2',
-          merchantName: 'Monthly Salary Credit',
-          category: 'Salary & Income',
-          amount: 3200.00,
-          type: 'CREDIT',
-          date: '20 Nov',
-        },
-        {
-          id: 'csv_' + Date.now() + '_3',
-          merchantName: 'Whole Foods Market',
-          category: 'Groceries',
-          amount: 78.45,
-          type: 'DEBIT',
-          date: '19 Nov',
-        },
-        {
-          id: 'csv_' + Date.now() + '_4',
-          merchantName: 'Uber Rides',
-          category: 'Transportation',
-          amount: 24.30,
-          type: 'DEBIT',
-          date: '18 Nov',
-        },
-        {
-          id: 'csv_' + Date.now() + '_5',
-          merchantName: 'Netflix Subscription',
-          category: 'Entertainment',
-          amount: 15.99,
-          type: 'DEBIT',
-          date: '17 Nov',
-        },
-        {
-          id: 'csv_' + Date.now() + '_6',
-          merchantName: 'Amazon Web Services',
-          category: 'Cloud Services',
-          amount: 45.00,
-          type: 'DEBIT',
-          date: '15 Nov',
-        },
-      ];
-      setTransactions((prev) => [...simulatedCsvTxs, ...prev]);
       Alert.alert(
-        'Statement Imported',
-        'CSV transactions successfully loaded into your dashboard.',
-        [
-          {
-            text: 'Go to Dashboard',
-            onPress: () => {
-              if (onSuccess) onSuccess();
-            },
-          },
-        ]
+        'Import Failed',
+        err.message || 'Could not process the CSV file. Please verify the file format and try again.'
       );
     } finally {
       setLoading(false);
@@ -623,8 +603,8 @@ export default function App() {
         {currentScreen === 'accountDetails' && (
           <AccountDetailsScreen
             theme={theme}
-            userName={userProfile.name}
-            selectedAccount={selectedAccount}
+            userName={selectedAccount?.accountName || accounts[0]?.accountName || userProfile.name}
+            selectedAccount={selectedAccount || accounts[0]}
             accounts={accounts}
             onBack={() => navigateTo('home')}
             onAddAccount={() => navigateTo('selectAccount')}

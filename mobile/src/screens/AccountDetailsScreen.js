@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import {
   Plus,
 } from 'lucide-react-native';
 import { formatCurrency } from '../theme';
+import { api } from '../api';
 
 const { width } = Dimensions.get('window');
 const BANNER_HEIGHT = 240;
@@ -36,6 +37,24 @@ export default function AccountDetailsScreen({
   onSelectAccount,
 }) {
   const [visibleAccountNumbers, setVisibleAccountNumbers] = useState({});
+  const [accountList, setAccountList] = useState(accounts);
+
+  useEffect(() => {
+    if (Array.isArray(accounts) && accounts.length > 0) {
+      setAccountList(accounts);
+    }
+  }, [accounts]);
+
+  // Fetch latest accounts directly from backend on mount so full accountNumber & ifscCode are guaranteed fresh
+  useEffect(() => {
+    api.getAccounts()
+      .then((fresh) => {
+        if (Array.isArray(fresh) && fresh.length > 0) {
+          setAccountList(fresh);
+        }
+      })
+      .catch(() => null);
+  }, []);
 
   const toggleAccountNumber = (key) => {
     setVisibleAccountNumbers((prev) => ({
@@ -44,10 +63,10 @@ export default function AccountDetailsScreen({
     }));
   };
 
-  // Use passed accounts, or build a single-item list from selectedAccount
+  // Use fresh accounts, or build a single-item list from selectedAccount
   const displayAccounts =
-    accounts.length > 0
-      ? accounts
+    accountList.length > 0
+      ? accountList
       : selectedAccount
       ? [selectedAccount]
       : [];
@@ -57,6 +76,10 @@ export default function AccountDetailsScreen({
     (sum, a) => sum + parseFloat(a.cachedBalance || 0),
     0
   );
+
+  // Account holder name: prefer account holder name from selectedAccount or first account, fallback to userName
+  const primaryAccount = selectedAccount || displayAccounts[0] || null;
+  const accountHolderName = primaryAccount?.accountName || userName;
 
   const getAccountIcon = (type) => {
     switch (type) {
@@ -82,16 +105,28 @@ export default function AccountDetailsScreen({
     }
   };
 
-  const maskNumber = (mask) => {
-    if (!mask) return 'XXXXXXX0274';
-    const digits = mask.replace(/\D/g, '').slice(-4) || '0274';
-    return `XXXXXXX${digits}`;
-  };
+  const getAccountNumberDisplay = (acc, isVisible) => {
+    const rawNumber = acc?.accountNumber
+      ? String(acc.accountNumber).trim()
+      : (acc?.metadata?.accountNumber ? String(acc.metadata.accountNumber).trim() : '');
 
-  const getUnmaskedNumber = (acc) => {
-    if (acc.accountNumber) return acc.accountNumber;
-    const digits = (acc.accountMask || '').replace(/\D/g, '').slice(-4) || '0274';
-    return `50100438${digits}`;
+    if (rawNumber) {
+      if (isVisible) {
+        // Space in groups of 4 for clean bank-style readability
+        return rawNumber.replace(/(\d{4})(?=\d)/g, '$1 ');
+      }
+      const last4 = rawNumber.slice(-4);
+      if (rawNumber.length > 4) {
+        return `•••• •••• ${last4}`;
+      }
+      return `•••• ${last4}`;
+    }
+
+    if (acc?.accountMask) {
+      return acc.accountMask;
+    }
+
+    return isVisible ? 'Not Available' : '•••• ••••';
   };
 
   return (
@@ -137,7 +172,7 @@ export default function AccountDetailsScreen({
               </View>
             </View>
 
-            <Text style={styles.bannerUserName}>{userName}</Text>
+            <Text style={styles.bannerUserName}>{accountHolderName}</Text>
 
             <Text style={styles.bannerBalanceLabel}>Combined Balance</Text>
             <View style={styles.bannerBalanceRow}>
@@ -157,7 +192,7 @@ export default function AccountDetailsScreen({
             const isNumberVisible = !!visibleAccountNumbers[accKey];
 
             return (
-              <TouchableOpacity
+              <View
                 key={accKey}
                 style={[
                   styles.accountCard,
@@ -168,49 +203,77 @@ export default function AccountDetailsScreen({
                   },
                   theme.cardShadowSoft,
                 ]}
-                onPress={() => onSelectAccount && onSelectAccount(acc)}
-                activeOpacity={0.85}
               >
-                {/* Account type label */}
-                <Text style={[styles.cardTypeLabel, { color: theme.textMuted }]}>
-                  {getAccountTypeLabel(acc.accountType)}
-                </Text>
+                {/* Account Holder Name + Active Badge Row */}
+                <TouchableOpacity
+                  style={styles.cardHeaderRow}
+                  onPress={() => onSelectAccount && onSelectAccount(acc)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.cardHolderTitle, { color: theme.textPrimary }]}>
+                      {acc.accountName || 'Account Holder'}
+                    </Text>
+                    <Text style={[styles.cardTypeLabel, { color: theme.textMuted }]}>
+                      {getAccountTypeLabel(acc.accountType)}
+                    </Text>
+                  </View>
+                  {isSelected && (
+                    <View style={[styles.selectedBadge, { backgroundColor: theme.primarySoft }]}>
+                      <Text style={[styles.selectedBadgeText, { color: theme.primary }]}>Active</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
 
-                {/* Mask + eye + balance + chevron row */}
+                {/* Account Number row with Eye toggle */}
                 <View style={styles.cardMainRow}>
                   <View style={styles.cardMaskRow}>
                     <Text style={[styles.cardMask, { color: theme.textPrimary }]}>
-                      {isNumberVisible ? getUnmaskedNumber(acc) : maskNumber(acc.accountMask)}
+                      {getAccountNumberDisplay(acc, isNumberVisible)}
                     </Text>
                     <TouchableOpacity
                       onPress={() => toggleAccountNumber(accKey)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      activeOpacity={0.7}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      activeOpacity={0.6}
+                      style={{ padding: 4 }}
                     >
                       {isNumberVisible ? (
-                        <EyeOff size={18} color={theme.textMuted} />
+                        <EyeOff size={19} color={theme.primary} />
                       ) : (
-                        <Eye size={18} color={theme.textMuted} />
+                        <Eye size={19} color={theme.textMuted} />
                       )}
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.cardBalanceRow}>
+                  <TouchableOpacity
+                    style={styles.cardBalanceRow}
+                    onPress={() => onSelectAccount && onSelectAccount(acc)}
+                    activeOpacity={0.8}
+                  >
                     <Text style={[styles.cardBalance, { color: theme.textPrimary }]}>
                       {formatCurrency(acc.cachedBalance || 0)}
                     </Text>
                     <ChevronRight size={18} color={theme.textMuted} strokeWidth={2.5} />
-                  </View>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Institution badge */}
-                <View style={[styles.institutionBadge, { backgroundColor: theme.primarySoft }]}>
-                  <IconComp size={12} color={theme.primary} />
-                  <Text style={[styles.institutionText, { color: theme.primary }]}>
-                    {acc.institutionName || 'Bank'}
-                  </Text>
+                {/* Bank badge + IFSC code row */}
+                <View style={styles.cardFooterRow}>
+                  <View style={[styles.institutionBadge, { backgroundColor: theme.primarySoft }]}>
+                    <IconComp size={12} color={theme.primary} />
+                    <Text style={[styles.institutionText, { color: theme.primary }]}>
+                      {acc.institutionName || 'Bank'}
+                    </Text>
+                  </View>
+                  {acc.ifscCode ? (
+                    <View style={[styles.ifscBadge, { backgroundColor: theme.surfaceAlt }]}>
+                      <Text style={[styles.ifscText, { color: theme.textMuted }]}>
+                        IFSC: {acc.ifscCode}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })}
 
@@ -344,8 +407,44 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardTypeLabel: {
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  cardHolderTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  selectedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  selectedBadgeText: {
+    fontSize: 11,
     fontWeight: '700',
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  ifscBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  ifscText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   cardMainRow: {
     flexDirection: 'row',

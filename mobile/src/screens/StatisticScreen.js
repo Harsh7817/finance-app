@@ -17,6 +17,8 @@ const { width } = Dimensions.get('window');
 export default function StatisticScreen({ theme, onNavigate, overview, balance = 0 }) {
   const [selectedPeriod, setSelectedPeriod] = useState('M'); // 'D' | 'W' | 'M' | 'Y'
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [expenseData, setExpenseData] = useState(null);
+  const [visualizationData, setVisualizationData] = useState(null);
 
   useEffect(() => {
     let timeframe = 'month';
@@ -24,9 +26,15 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
     else if (selectedPeriod === 'W') timeframe = 'week';
     else if (selectedPeriod === 'Y') timeframe = 'year';
 
-    api.getOverview(timeframe)
-      .then((data) => setAnalyticsData(data))
-      .catch(() => null);
+    Promise.all([
+      api.getOverview(timeframe).catch(() => null),
+      api.getExpenses(timeframe).catch(() => null),
+      api.getVisualizations(6).catch(() => null),
+    ]).then(([ov, exp, viz]) => {
+      if (ov) setAnalyticsData(ov);
+      if (exp) setExpenseData(exp);
+      if (viz) setVisualizationData(viz);
+    });
   }, [selectedPeriod]);
 
   const periods = [
@@ -36,26 +44,52 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
     { id: 'Y', label: 'Year' },
   ];
 
-  const totalBalance = balance || (analyticsData?.cashFlow?.netCashFlow !== undefined ? analyticsData.cashFlow.netCashFlow : 0);
-  const totalIncome = analyticsData?.cashFlow?.totalIncome !== undefined ? analyticsData.cashFlow.totalIncome : (overview?.cashFlow?.totalIncome || 0);
-  const totalExpense = analyticsData?.cashFlow?.totalExpenses !== undefined ? analyticsData.cashFlow.totalExpenses : (overview?.cashFlow?.totalExpenses || 0);
+  const totalBalance = balance || (analyticsData?.summary?.totalAccountBalance !== undefined ? analyticsData.summary.totalAccountBalance : (overview?.summary?.totalAccountBalance || 0));
+  const totalIncome = analyticsData?.summary?.totalIncome !== undefined ? analyticsData.summary.totalIncome : (overview?.summary?.totalIncome || 0);
+  const totalExpense = analyticsData?.summary?.totalExpenditure !== undefined ? analyticsData.summary.totalExpenditure : (overview?.summary?.totalExpenditure || 0);
 
   // Dynamic bar height scaling based on actual figures
   const maxVal = Math.max(totalIncome, totalExpense, 1);
   const incomeHeight = Math.max(12, Math.min(140, Math.round((totalIncome / maxVal) * 140)));
   const expenseHeight = Math.max(12, Math.min(140, Math.round((totalExpense / maxVal) * 140)));
 
-  const barData = [
-    { label: selectedPeriod === 'M' ? 'Current' : selectedPeriod, incomeH: incomeHeight, expenseH: expenseHeight, active: true },
+  // Real monthly trend data if available from visualizations
+  const barData = Array.isArray(visualizationData?.monthlyTrendsChart) && visualizationData.monthlyTrendsChart.length > 0
+    ? visualizationData.monthlyTrendsChart.slice(-6).map((item) => {
+        const inc = Number(item.income || 0);
+        const exp = Number(item.expense || 0);
+        const mMax = Math.max(inc, exp, 1);
+        const monthLabel = item.month ? item.month.slice(5) : '';
+        return {
+          label: monthLabel,
+          incomeH: Math.max(12, Math.min(140, Math.round((inc / mMax) * 140))),
+          expenseH: Math.max(12, Math.min(140, Math.round((exp / mMax) * 140))),
+          active: true,
+        };
+      })
+    : [
+        { label: selectedPeriod === 'M' ? 'Current' : selectedPeriod, incomeH: incomeHeight, expenseH: expenseHeight, active: true },
+      ];
+
+  // Donut chart spending categories from real backend expense analytics
+  const categoryPalette = [
+    theme.primary,
+    theme.accentCyan,
+    theme.accentPurple,
+    theme.accentAmber,
+    theme.accentEmerald,
   ];
 
-  // Donut chart spending categories
-  const spendingCategories = [
-    { name: 'Grocery', percentage: 38, amount: 1217.9, color: theme.accentCyan },
-    { name: 'Food', percentage: 26, amount: 833.3, color: theme.primary },
-    { name: 'Drink', percentage: 18, amount: 576.9, color: theme.accentPurple },
-    { name: 'Equipment', percentage: 18, amount: 576.9, color: theme.accentAmber },
-  ];
+  const spendingCategories = Array.isArray(expenseData?.categorySpending) && expenseData.categorySpending.length > 0
+    ? expenseData.categorySpending.slice(0, 5).map((cat, idx) => ({
+        name: cat.name,
+        percentage: Math.round(Number(cat.percentage || 0)),
+        amount: Number(cat.totalAmount || 0),
+        color: categoryPalette[idx % categoryPalette.length],
+      }))
+    : (totalExpense > 0
+      ? [{ name: 'Expenditure', percentage: 100, amount: totalExpense, color: theme.primary }]
+      : []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -232,63 +266,62 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
                     strokeWidth="12"
                     fill="none"
                   />
-                  {/* Segment 1: Cyan (38%) */}
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke={theme.accentCyan}
-                    strokeWidth="12"
-                    strokeDasharray="91 148"
-                    strokeDashoffset="0"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Segment 2: Blue (26%) */}
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke={theme.primary}
-                    strokeWidth="12"
-                    strokeDasharray="62 177"
-                    strokeDashoffset="-95"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                  {/* Segment 3: Purple (18%) */}
-                  <Circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke={theme.accentPurple}
-                    strokeWidth="12"
-                    strokeDasharray="43 196"
-                    strokeDashoffset="-160"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
+                  {/* Dynamic Category Segments */}
+                  {(() => {
+                    const circum = 238.76;
+                    let accumulatedOffset = 0;
+                    return spendingCategories.map((c, idx) => {
+                      const pct = Math.max(0, Math.min(100, c.percentage || 0));
+                      const dash = Math.round((pct / 100) * circum);
+                      const gap = Math.max(0, circum - dash);
+                      const currentOffset = accumulatedOffset;
+                      accumulatedOffset += dash;
+                      if (dash <= 0) return null;
+                      return (
+                        <Circle
+                          key={c.name || idx}
+                          cx="50"
+                          cy="50"
+                          r="38"
+                          stroke={c.color}
+                          strokeWidth="12"
+                          strokeDasharray={`${dash} ${gap}`}
+                          strokeDashoffset={-currentOffset}
+                          fill="none"
+                          strokeLinecap="round"
+                        />
+                      );
+                    });
+                  })()}
                 </G>
               </Svg>
               <View style={styles.donutCenter}>
-                <Text style={[styles.donutCenterVal, { color: theme.textPrimary }]}>72%</Text>
-                <Text style={[styles.donutCenterLabel, { color: theme.textMuted }]}>Budget</Text>
+                <Text style={[styles.donutCenterVal, { color: theme.textPrimary }]} numberOfLines={1}>
+                  {formatCurrency(totalExpense)}
+                </Text>
+                <Text style={[styles.donutCenterLabel, { color: theme.textMuted }]}>Spent</Text>
               </View>
             </View>
 
             {/* Category breakdown tags */}
             <View style={styles.categoriesList}>
-              {spendingCategories.map((c) => (
-                <View key={c.name} style={styles.categoryItem}>
-                  <View style={[styles.catColorDot, { backgroundColor: c.color }]} />
-                  <View style={styles.catInfo}>
-                    <Text style={[styles.catName, { color: theme.textPrimary }]}>{c.name}</Text>
-                    <Text style={[styles.catAmt, { color: theme.textMuted }]}>
-                      {c.percentage}% • {formatCurrency(c.amount)}
-                    </Text>
-                  </View>
+              {spendingCategories.length === 0 ? (
+                <View style={{ paddingVertical: 12 }}>
+                  <Text style={{ color: theme.textMuted, fontSize: 13 }}>No expense categories recorded yet.</Text>
                 </View>
-              ))}
+              ) : (
+                spendingCategories.map((c) => (
+                  <View key={c.name} style={styles.categoryItem}>
+                    <View style={[styles.catColorDot, { backgroundColor: c.color }]} />
+                    <View style={styles.catInfo}>
+                      <Text style={[styles.catName, { color: theme.textPrimary }]}>{c.name}</Text>
+                      <Text style={[styles.catAmt, { color: theme.textMuted }]}>
+                        {c.percentage}% • {formatCurrency(c.amount)}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         </View>
