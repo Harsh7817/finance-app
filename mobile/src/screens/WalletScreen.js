@@ -28,10 +28,10 @@ export default function WalletScreen({
   const current = walletCards[selectedCardIdx];
 
   const spendingCategories = [
-    { name: 'Grocery', pct: 35, color: theme.accentCyan, amount: '$420.28' },
-    { name: 'Food', pct: 28, color: theme.primary, amount: '$336.22' },
-    { name: 'Drinks', pct: 20, color: theme.accentPurple, amount: '$240.16' },
-    { name: 'Equipment', pct: 17, color: theme.accentAmber, amount: '$204.14' },
+    { name: 'Grocery', pct: 35, color: theme.accentCyan, amount: '₹4,200' },
+    { name: 'Food', pct: 28, color: theme.primary, amount: '₹3,360' },
+    { name: 'Drinks', pct: 20, color: theme.accentPurple, amount: '₹2,400' },
+    { name: 'Equipment', pct: 17, color: theme.accentAmber, amount: '₹2,040' },
   ];
 
   return (

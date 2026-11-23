@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 // Current active PC Wi-Fi IP is 172.20.249.4.
 // For Android Emulator, use '10.0.2.2'.
 // For Web or iOS Simulator, use 'localhost'.
-export const DEFAULT_API_HOST = Platform.OS === 'android' ? '172.20.249.4' : 'localhost';
+export const DEFAULT_API_HOST = Platform.OS === 'android' ? '172.20.249.127' : 'localhost';
 export const API_PORT = '3000';
 
 let dynamicHost = DEFAULT_API_HOST;

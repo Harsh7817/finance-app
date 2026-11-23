@@ -96,7 +96,7 @@ export default function HomeScreen({
     },
   ];
 
-  const allTxList = transactions && transactions.length > 0 ? transactions : defaultActivity;
+  const allTxList = transactions && transactions.length > 0 ? transactions : [];
   const displayedTransactions = showAllTransactions ? allTxList : allTxList.slice(0, 4);
 
   return (
@@ -157,7 +157,12 @@ export default function HomeScreen({
           </View>
 
           <View style={styles.txList}>
-            {displayedTransactions.map((tx, idx) => {
+            {displayedTransactions.length === 0 ? (
+              <View style={[styles.txRow, { backgroundColor: theme.surface, borderColor: theme.border, justifyContent: 'center', paddingVertical: 24 }]}>
+                <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '500' }}>No transactions recorded yet</Text>
+              </View>
+            ) : (
+              displayedTransactions.map((tx, idx) => {
               const isCredit = tx.type === 'CREDIT';
               return (
                 <View
@@ -209,7 +214,7 @@ export default function HomeScreen({
                   </Text>
                 </View>
               );
-            })}
+            }))}
           </View>
         </View>
       </ScrollView>

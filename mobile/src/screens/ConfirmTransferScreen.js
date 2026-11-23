@@ -77,7 +77,7 @@ export default function ConfirmTransferScreen({
 
           <View style={styles.row}>
             <Text style={[styles.rowLabel, { color: theme.textMuted }]}>Transfer Fee</Text>
-            <Text style={[styles.rowVal, { color: theme.accentEmerald }]}>Free ($0.00)</Text>
+            <Text style={[styles.rowVal, { color: theme.accentEmerald }]}>Free (₹0.00)</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: theme.borderLight }]} />
 

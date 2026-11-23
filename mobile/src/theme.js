@@ -139,19 +139,19 @@ export const walleyTheme = {
   },
 };
 
-export const formatCurrency = (amt, currency = 'USD') => {
+export const formatCurrency = (amt, currency = 'INR') => {
   const num = parseFloat(amt || 0);
-  if (currency === 'INR') {
-    return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: num % 1 === 0 ? 0 : 2 });
-  }
-  return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: num % 1 === 0 ? 0 : 2 });
 };
 
-export const formatShortCurrency = (amt, currency = 'USD') => {
+export const formatShortCurrency = (amt, currency = 'INR') => {
   const num = parseFloat(amt || 0);
-  const symbol = currency === 'INR' ? '₹' : '$';
-  if (Math.abs(num) >= 1000000) {
-    return `${symbol}${(num / 1000000).toFixed(1)}M`;
+  const symbol = '₹';
+  if (Math.abs(num) >= 10000000) {
+    return `${symbol}${(num / 10000000).toFixed(1)}Cr`;
+  }
+  if (Math.abs(num) >= 100000) {
+    return `${symbol}${(num / 100000).toFixed(1)}L`;
   }
   if (Math.abs(num) >= 1000) {
     return `${symbol}${(num / 1000).toFixed(1)}k`;

@@ -52,7 +52,7 @@ export default function StatisticScreen({ theme, onNavigate }) {
         <View style={styles.balanceSection}>
           <Text style={[styles.balanceLabel, { color: theme.textMuted }]}>Total Balance</Text>
           <View style={styles.balanceRow}>
-            <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>$12,549.00</Text>
+            <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>₹12,549.00</Text>
 
             {/* D / W / M / Y Selector */}
             <View style={[styles.periodToggle, { backgroundColor: theme.surfaceAlt }]}>
@@ -146,7 +146,7 @@ export default function StatisticScreen({ theme, onNavigate }) {
             </View>
             <View>
               <Text style={[styles.metricLabel, { color: theme.textMuted }]}>Income</Text>
-              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>$5,448</Text>
+              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>₹5,448</Text>
             </View>
           </View>
 
@@ -163,7 +163,7 @@ export default function StatisticScreen({ theme, onNavigate }) {
             </View>
             <View>
               <Text style={[styles.metricLabel, { color: theme.textMuted }]}>Expense</Text>
-              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>$3,205</Text>
+              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>₹3,205</Text>
             </View>
           </View>
         </View>

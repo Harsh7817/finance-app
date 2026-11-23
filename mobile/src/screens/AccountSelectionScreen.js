@@ -127,13 +127,12 @@ export default function AccountSelectionScreen({
         setAccounts(data);
         setSelectedAccountId(data[0].id);
       } else {
-        // Use demo accounts for visual richness
-        setAccounts(demoFallbackAccounts);
-        setSelectedAccountId(demoFallbackAccounts[0].id);
+        setAccounts([]);
+        setSelectedAccountId(null);
       }
     } catch {
-      setAccounts(demoFallbackAccounts);
-      setSelectedAccountId(demoFallbackAccounts[0].id);
+      setAccounts([]);
+      setSelectedAccountId(null);
     } finally {
       setLoading(false);
     }
@@ -617,7 +616,7 @@ export default function AccountSelectionScreen({
 
               {/* Initial Balance */}
               <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Initial Balance ($ / ₹)</Text>
+                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Initial Balance (₹)</Text>
                 <TextInput
                   style={[
                     styles.formInput,
