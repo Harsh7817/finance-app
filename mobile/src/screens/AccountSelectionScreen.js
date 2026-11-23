@@ -48,7 +48,7 @@ export default function AccountSelectionScreen({
 
   // New Account Form State
   const [accountName, setAccountName] = useState('');
-  const [institutionName, setInstitutionName] = useState('State Bank of India (SBI)');
+  const [institutionName, setInstitutionName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState('SAVINGS');
   const [openingBalance, setOpeningBalance] = useState('1200.00');
@@ -189,6 +189,7 @@ export default function AccountSelectionScreen({
 
       // Reset form
       setAccountName('');
+      setInstitutionName('');
       setAccountNumber('');
       setOpeningBalance('');
       setIfscCode('');
@@ -605,7 +606,7 @@ export default function AccountSelectionScreen({
                       { color: institutionName ? theme.textPrimary : theme.textDim },
                     ]}
                   >
-                    {institutionName || 'Select a Bank'}
+                    {institutionName || 'Select Bank'}
                   </Text>
                   {showBankDropdown ? (
                     <ChevronUp size={18} color={theme.primary} />
