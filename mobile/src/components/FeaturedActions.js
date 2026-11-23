@@ -1,42 +1,42 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ArrowUpRight, ArrowDownLeft, Plus, Receipt } from 'lucide-react-native';
+import { PlusCircle, FileSpreadsheet, PieChart, Target } from 'lucide-react-native';
 
 export default function FeaturedActions({
   theme,
-  onPressTransfer,
-  onPressRequest,
-  onPressTopUp,
-  onPressBill,
+  onPressAddTx,
+  onPressUploadCsv,
+  onPressSetBudget,
+  onPressSetGoal,
 }) {
   const actions = [
     {
-      id: 'transfer',
-      title: 'Transfer',
-      icon: ArrowUpRight,
-      color: theme.primary,
-      onPress: onPressTransfer,
+      id: 'addTx',
+      title: 'Add Transaction',
+      icon: PlusCircle,
+      color: theme.accentEmerald || '#10B981',
+      onPress: onPressAddTx,
     },
     {
-      id: 'request',
-      title: 'Request',
-      icon: ArrowDownLeft,
-      color: theme.accentCyan,
-      onPress: onPressRequest,
+      id: 'uploadCsv',
+      title: 'Upload CSV Statement',
+      icon: FileSpreadsheet,
+      color: theme.primary || '#4361EE',
+      onPress: onPressUploadCsv,
     },
     {
-      id: 'topup',
-      title: 'Top up',
-      icon: Plus,
-      color: theme.accentPurple,
-      onPress: onPressTopUp,
+      id: 'budget',
+      title: 'Set Monthly Budget',
+      icon: PieChart,
+      color: theme.accentPurple || '#7209B7',
+      onPress: onPressSetBudget,
     },
     {
-      id: 'bill',
-      title: 'Bill',
-      icon: Receipt,
-      color: theme.accentAmber,
-      onPress: onPressBill,
+      id: 'goal',
+      title: 'New Savings Goal',
+      icon: Target,
+      color: theme.accentRose || '#F72585',
+      onPress: onPressSetGoal,
     },
   ];
 
@@ -63,9 +63,9 @@ export default function FeaturedActions({
                   theme.cardShadowSoft,
                 ]}
               >
-                <Icon size={22} color={act.color} strokeWidth={2.4} />
+                <Icon size={24} color={act.color} strokeWidth={2.2} />
               </View>
-              <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>
+              <Text style={[styles.actionLabel, { color: theme.textSecondary }]} numberOfLines={2}>
                 {act.title}
               </Text>
             </TouchableOpacity>
@@ -78,7 +78,7 @@ export default function FeaturedActions({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     marginVertical: 14,
   },
   sectionTitle: {
@@ -90,22 +90,26 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   actionBtn: {
+    flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 2,
     gap: 8,
   },
   iconCircle: {
-    width: 60,
-    height: 60,
+    width: 58,
+    height: 58,
     borderRadius: 20,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 14,
   },
 });

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,6 @@ import {
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  TrendingUp,
-  ChevronRight,
   Zap,
   ShoppingBag,
   Coffee,
@@ -32,10 +30,24 @@ export default function HomeScreen({
   transactions = [],
   onNavigate,
   onSwitchAccount,
-  onOpenQuickActions,
+  onPressAddTx,
+  onPressUploadCsv,
+  onPressSetBudget,
+  onPressSetGoal,
   onRefresh,
   refreshing = false,
 }) {
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const scrollViewRef = useRef(null);
+  const transactionsYRef = useRef(0);
+
+  const scrollToTransactions = () => {
+    scrollViewRef.current?.scrollTo({
+      y: transactionsYRef.current,
+      animated: true,
+    });
+  };
+
   const displayBalance = selectedAccount?.cachedBalance !== undefined
     ? Number(selectedAccount.cachedBalance)
     : balance;
@@ -84,6 +96,9 @@ export default function HomeScreen({
     },
   ];
 
+  const allTxList = transactions && transactions.length > 0 ? transactions : defaultActivity;
+  const displayedTransactions = showAllTransactions ? allTxList : allTxList.slice(0, 4);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       <WalleyHeader
@@ -96,6 +111,7 @@ export default function HomeScreen({
       />
 
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
@@ -112,52 +128,36 @@ export default function HomeScreen({
           institutionName={selectedAccount?.institutionName || 'Citi Bank'}
           accountType={selectedAccount?.accountType || 'SAVINGS'}
           onViewAccounts={() => onNavigate('accountDetails')}
-          onViewTransactions={() => onNavigate('statistic')}
+          onViewTransactions={scrollToTransactions}
         />
 
-        {/* Featured Actions Grid (Transfer, Request, Top Up, Bill) */}
+        {/* Featured Actions Grid (Add Transaction, Upload CSV, Budget, Goal) */}
         <FeaturedActions
           theme={theme}
-          onPressTransfer={() => onNavigate('transfer')}
-          onPressRequest={() => onNavigate('request')}
-          onPressTopUp={() => onNavigate('selectCard')}
-          onPressBill={() => onNavigate('billPay')}
+          onPressAddTx={onPressAddTx}
+          onPressUploadCsv={onPressUploadCsv}
+          onPressSetBudget={onPressSetBudget}
+          onPressSetGoal={onPressSetGoal}
         />
 
-        {/* Promotional Banner: Make Finance More Efficient */}
-        <TouchableOpacity
-          style={[
-            styles.promoBanner,
-            { backgroundColor: theme.primary, borderColor: theme.primaryBorder },
-            theme.cardShadow,
-          ]}
-          onPress={() => onNavigate('statistic')}
-          activeOpacity={0.9}
+        {/* Transactions */}
+        <View
+          style={styles.activitySection}
+          onLayout={(event) => {
+            transactionsYRef.current = event.nativeEvent.layout.y;
+          }}
         >
-          <View style={styles.promoTextCol}>
-            <Text style={styles.promoTitle}>Make Finance More Efficient</Text>
-            <Text style={styles.promoSub}>Review intelligent monthly insights & statistics</Text>
-            <View style={styles.seeAllPill}>
-              <Text style={styles.seeAllText}>See All</Text>
-              <ChevronRight size={14} color="#FFFFFF" />
-            </View>
-          </View>
-          <View style={styles.promoIconBubble}>
-            <TrendingUp size={32} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
-
-        {/* Last Activity / Recent Transactions */}
-        <View style={styles.activitySection}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Last activity</Text>
-            <TouchableOpacity onPress={() => onNavigate('statistic')}>
-              <Text style={[styles.seeAllLink, { color: theme.primary }]}>See all</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Transactions</Text>
+            <TouchableOpacity onPress={() => setShowAllTransactions((prev) => !prev)}>
+              <Text style={[styles.seeAllLink, { color: theme.primary }]}>
+                {showAllTransactions ? 'Show less' : 'See all'}
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.txList}>
-            {(transactions && transactions.length > 0 ? transactions.slice(0, 5) : defaultActivity).map((tx, idx) => {
+            {displayedTransactions.map((tx, idx) => {
               const isCredit = tx.type === 'CREDIT';
               return (
                 <View
@@ -223,55 +223,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 28,
-  },
-  promoBanner: {
-    marginHorizontal: 20,
-    marginVertical: 12,
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  promoTextCol: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  promoTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  promoSub: {
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 12,
-  },
-  seeAllPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
-    alignSelf: 'flex-start',
-  },
-  seeAllText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  promoIconBubble: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   activitySection: {
     paddingHorizontal: 20,

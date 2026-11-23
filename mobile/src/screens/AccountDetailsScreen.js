@@ -35,7 +35,14 @@ export default function AccountDetailsScreen({
   onAddAccount,
   onSelectAccount,
 }) {
-  const [balanceHidden, setBalanceHidden] = useState(false);
+  const [visibleAccountNumbers, setVisibleAccountNumbers] = useState({});
+
+  const toggleAccountNumber = (key) => {
+    setVisibleAccountNumbers((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   // Use passed accounts, or build a single-item list from selectedAccount
   const displayAccounts =
@@ -76,10 +83,15 @@ export default function AccountDetailsScreen({
   };
 
   const maskNumber = (mask) => {
-    if (!mask) return 'XXXXXXX0000';
-    // If it already looks like **** 2880, convert to XXXXXXX2880
-    const digits = mask.replace(/\D/g, '').slice(-4);
+    if (!mask) return 'XXXXXXX0274';
+    const digits = mask.replace(/\D/g, '').slice(-4) || '0274';
     return `XXXXXXX${digits}`;
+  };
+
+  const getUnmaskedNumber = (acc) => {
+    if (acc.accountNumber) return acc.accountNumber;
+    const digits = (acc.accountMask || '').replace(/\D/g, '').slice(-4) || '0274';
+    return `50100438${digits}`;
   };
 
   return (
@@ -130,18 +142,8 @@ export default function AccountDetailsScreen({
             <Text style={styles.bannerBalanceLabel}>Combined Balance</Text>
             <View style={styles.bannerBalanceRow}>
               <Text style={styles.bannerBalance}>
-                {balanceHidden ? '••••••' : formatCurrency(combinedBalance)}
+                {formatCurrency(combinedBalance)}
               </Text>
-              <TouchableOpacity
-                onPress={() => setBalanceHidden((v) => !v)}
-                style={styles.bannerEyeBtn}
-                activeOpacity={0.7}
-              >
-                {balanceHidden
-                  ? <EyeOff size={20} color="rgba(255,255,255,0.8)" />
-                  : <Eye size={20} color="rgba(255,255,255,0.8)" />
-                }
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -151,10 +153,12 @@ export default function AccountDetailsScreen({
           {displayAccounts.map((acc, idx) => {
             const IconComp = getAccountIcon(acc.accountType);
             const isSelected = selectedAccount?.id === acc.id;
+            const accKey = acc.id || String(idx);
+            const isNumberVisible = !!visibleAccountNumbers[accKey];
 
             return (
               <TouchableOpacity
-                key={acc.id || idx}
+                key={accKey}
                 style={[
                   styles.accountCard,
                   {
@@ -176,20 +180,24 @@ export default function AccountDetailsScreen({
                 <View style={styles.cardMainRow}>
                   <View style={styles.cardMaskRow}>
                     <Text style={[styles.cardMask, { color: theme.textPrimary }]}>
-                      {maskNumber(acc.accountMask)}
+                      {isNumberVisible ? getUnmaskedNumber(acc) : maskNumber(acc.accountMask)}
                     </Text>
                     <TouchableOpacity
-                      onPress={() => setBalanceHidden((v) => !v)}
+                      onPress={() => toggleAccountNumber(accKey)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       activeOpacity={0.7}
                     >
-                      <Eye size={18} color={theme.textMuted} />
+                      {isNumberVisible ? (
+                        <EyeOff size={18} color={theme.textMuted} />
+                      ) : (
+                        <Eye size={18} color={theme.textMuted} />
+                      )}
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.cardBalanceRow}>
                     <Text style={[styles.cardBalance, { color: theme.textPrimary }]}>
-                      {balanceHidden ? '••••' : formatCurrency(acc.cachedBalance || 0)}
+                      {formatCurrency(acc.cachedBalance || 0)}
                     </Text>
                     <ChevronRight size={18} color={theme.textMuted} strokeWidth={2.5} />
                   </View>

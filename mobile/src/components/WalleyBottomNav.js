@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import {
   Home,
   BarChart2,
-  Plus,
   Wallet,
   User,
 } from 'lucide-react-native';
@@ -12,7 +11,6 @@ export default function WalleyBottomNav({
   theme,
   activeTab,
   onSelectTab,
-  onPressCenterFab,
 }) {
   return (
     <View style={[styles.wrapper, { backgroundColor: theme.bg }]}>
@@ -54,18 +52,7 @@ export default function WalleyBottomNav({
           {activeTab === 'statistic' && <View style={[styles.activeDot, { backgroundColor: theme.primary }]} />}
         </TouchableOpacity>
 
-        {/* Center Floating Action Button (+) */}
-        <View style={styles.fabContainer}>
-          <TouchableOpacity
-            style={[styles.centerFab, { backgroundColor: theme.primary }, theme.floatingShadow]}
-            onPress={onPressCenterFab}
-            activeOpacity={0.88}
-          >
-            <Plus size={26} color="#FFFFFF" strokeWidth={2.8} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Tab 4: Wallet */}
+        {/* Tab 3: Wallet */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => onSelectTab('wallet')}
@@ -79,7 +66,7 @@ export default function WalleyBottomNav({
           {activeTab === 'wallet' && <View style={[styles.activeDot, { backgroundColor: theme.primary }]} />}
         </TouchableOpacity>
 
-        {/* Tab 5: Profile */}
+        {/* Tab 4: Profile */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => onSelectTab('profile')}
@@ -125,18 +112,5 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-  },
-  fabContainer: {
-    width: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerFab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: -16,
   },
 });

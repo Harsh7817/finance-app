@@ -8,7 +8,7 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { Wifi, Eye, EyeOff, RefreshCw } from 'lucide-react-native';
+import { Wifi, Eye, EyeOff } from 'lucide-react-native';
 import { formatCurrency } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -121,7 +121,7 @@ export default function WalleyCard({
           </TouchableOpacity>
         </View>
 
-        {/* Middle: Combined Balance + refresh */}
+        {/* Middle: Combined Balance */}
         <View style={styles.balanceRow}>
           <View>
             <Text style={styles.balanceLabel}>Combined Balance</Text>
@@ -129,9 +129,6 @@ export default function WalleyCard({
               {balanceHidden ? '••••••' : formatCurrency(balance)}
             </Text>
           </View>
-          <TouchableOpacity style={styles.refreshBtn} activeOpacity={0.7} onPress={onPress}>
-            <RefreshCw size={20} color="rgba(255,255,255,0.75)" />
-          </TouchableOpacity>
         </View>
 
         {/* Divider */}
@@ -211,9 +208,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.5,
-  },
-  refreshBtn: {
-    padding: 6,
   },
   dividerLine: {
     height: 1,
