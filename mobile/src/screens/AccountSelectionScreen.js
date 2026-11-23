@@ -49,6 +49,7 @@ export default function AccountSelectionScreen({
   // New Account Form State
   const [accountName, setAccountName] = useState('');
   const [institutionName, setInstitutionName] = useState('State Bank of India (SBI)');
+  const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState('SAVINGS');
   const [openingBalance, setOpeningBalance] = useState('1200.00');
   const [ifscCode, setIfscCode] = useState('');
@@ -152,7 +153,10 @@ export default function AccountSelectionScreen({
 
     setCreating(true);
     try {
-      const generatedMask = ifscCode.trim()
+      const trimmedAccNum = accountNumber.trim();
+      const generatedMask = trimmedAccNum.length >= 4
+        ? `**** ${trimmedAccNum.slice(-4)}`
+        : ifscCode.trim()
         ? `**** ${ifscCode.trim().slice(-4)}`
         : '**** 2880';
 
@@ -161,6 +165,7 @@ export default function AccountSelectionScreen({
         institutionName: institutionName.trim(),
         accountType: accountType,
         openingBalance: parseFloat(openingBalance) || 0,
+        accountNumber: trimmedAccNum,
         accountMask: generatedMask,
         currency: currency,
         ifscCode: ifscCode.trim().toUpperCase(),
@@ -184,6 +189,7 @@ export default function AccountSelectionScreen({
 
       // Reset form
       setAccountName('');
+      setAccountNumber('');
       setOpeningBalance('');
       setIfscCode('');
       setShowBankDropdown(false);
@@ -658,6 +664,22 @@ export default function AccountSelectionScreen({
                     </ScrollView>
                   </View>
                 )}
+              </View>
+
+              {/* Account Number */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Account Number</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
+                  ]}
+                  placeholder="e.g. 501004380274"
+                  placeholderTextColor={theme.textDim}
+                  keyboardType="numeric"
+                  value={accountNumber}
+                  onChangeText={setAccountNumber}
+                />
               </View>
 
               {/* IFSC Code */}
