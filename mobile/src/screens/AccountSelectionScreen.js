@@ -22,6 +22,8 @@ import {
   Building2,
   X,
   LogOut,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import WalleyLogo from '../components/WalleyLogo';
 import { formatCurrency } from '../theme';
@@ -42,11 +44,34 @@ export default function AccountSelectionScreen({
 
   // New Account Form State
   const [accountName, setAccountName] = useState('');
-  const [institutionName, setInstitutionName] = useState('Citi Bank');
+  const [institutionName, setInstitutionName] = useState('State Bank of India (SBI)');
   const [accountType, setAccountType] = useState('SAVINGS');
   const [openingBalance, setOpeningBalance] = useState('1200.00');
-  const [accountMask, setAccountMask] = useState('2880');
+  const [ifscCode, setIfscCode] = useState('');
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [currency, setCurrency] = useState('USD');
+
+  const banksList = [
+    'State Bank of India (SBI)',
+    'HDFC Bank',
+    'ICICI Bank',
+    'Axis Bank',
+    'Kotak Mahindra Bank',
+    'Punjab National Bank (PNB)',
+    'Bank of Baroda',
+    'Canara Bank',
+    'Union Bank of India',
+    'IndusInd Bank',
+    'Yes Bank',
+    'Federal Bank',
+    'IDFC FIRST Bank',
+    'Citi Bank',
+    'Chase Bank',
+    'Bank of America',
+    'HSBC',
+    'Standard Chartered',
+    'DBS Bank',
+  ];
 
   const accountTypes = [
     { id: 'SAVINGS', label: 'Savings', icon: Landmark },
@@ -116,21 +141,26 @@ export default function AccountSelectionScreen({
 
   const handleCreateAccount = async () => {
     if (!accountName.trim()) {
-      return Alert.alert('Required', 'Please enter an account name (e.g. "Primary Savings").');
+      return Alert.alert('Required', 'Please enter the account holder name.');
     }
     if (!institutionName.trim()) {
-      return Alert.alert('Required', 'Please enter a bank or institution name.');
+      return Alert.alert('Required', 'Please select a bank.');
     }
 
     setCreating(true);
     try {
+      const generatedMask = ifscCode.trim()
+        ? `**** ${ifscCode.trim().slice(-4)}`
+        : '**** 2880';
+
       const payload = {
         accountName: accountName.trim(),
         institutionName: institutionName.trim(),
         accountType: accountType,
         openingBalance: parseFloat(openingBalance) || 0,
-        accountMask: accountMask.trim() ? `**** ${accountMask.trim().slice(-4)}` : '**** 2880',
+        accountMask: generatedMask,
         currency: currency,
+        ifscCode: ifscCode.trim().toUpperCase(),
       };
 
       let newAccount;
@@ -147,23 +177,17 @@ export default function AccountSelectionScreen({
 
       const updatedList = [newAccount, ...accounts];
       setAccounts(updatedList);
-      setSelectedAccountId(newAccount.id);
       setShowAddModal(false);
 
       // Reset form
       setAccountName('');
       setOpeningBalance('');
-      setAccountMask('');
+      setIfscCode('');
+      setShowBankDropdown(false);
 
       Alert.alert(
-        'Account Added',
-        `"${newAccount.accountName}" has been successfully added to your Walley profile.`,
-        [
-          {
-            text: 'Go to Dashboard',
-            onPress: () => onSelectAccount(newAccount),
-          },
-        ]
+        'Account Created',
+        `"${newAccount.accountName}" has been successfully added to your accounts.`
       );
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not create account.');
@@ -482,68 +506,129 @@ export default function AccountSelectionScreen({
                 </ScrollView>
               </View>
 
-              {/* Account Name */}
+              {/* Account Holder Name */}
               <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Account Name</Text>
+                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Account Holder Name</Text>
                 <TextInput
                   style={[
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="e.g. Personal Savings, Salary Account"
+                  placeholder="e.g. Subhash Srija, Arya Wijaya"
                   placeholderTextColor={theme.textDim}
                   value={accountName}
                   onChangeText={setAccountName}
                 />
               </View>
 
-              {/* Institution Name */}
+              {/* Bank Dropdown */}
               <View style={styles.formGroup}>
-                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Bank / Institution</Text>
+                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Bank</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.dropdownTrigger,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor: showBankDropdown ? theme.primary : theme.inputBorder,
+                    },
+                  ]}
+                  onPress={() => setShowBankDropdown((prev) => !prev)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownTriggerText,
+                      { color: institutionName ? theme.textPrimary : theme.textDim },
+                    ]}
+                  >
+                    {institutionName || 'Select a Bank'}
+                  </Text>
+                  {showBankDropdown ? (
+                    <ChevronUp size={18} color={theme.primary} />
+                  ) : (
+                    <ChevronDown size={18} color={theme.textMuted} />
+                  )}
+                </TouchableOpacity>
+
+                {showBankDropdown && (
+                  <View
+                    style={[
+                      styles.dropdownMenu,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                      theme.cardShadowSoft,
+                    ]}
+                  >
+                    <ScrollView
+                      style={{ maxHeight: 180 }}
+                      nestedScrollEnabled={true}
+                      showsVerticalScrollIndicator={true}
+                    >
+                      {banksList.map((b) => {
+                        const isSelected = institutionName === b;
+                        return (
+                          <TouchableOpacity
+                            key={b}
+                            style={[
+                              styles.dropdownItem,
+                              isSelected && { backgroundColor: theme.primarySoft },
+                            ]}
+                            onPress={() => {
+                              setInstitutionName(b);
+                              setShowBankDropdown(false);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.dropdownItemText,
+                                { color: isSelected ? theme.primary : theme.textPrimary },
+                                isSelected && { fontWeight: '700' },
+                              ]}
+                            >
+                              {b}
+                            </Text>
+                            {isSelected && <Check size={16} color={theme.primary} />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* IFSC Code */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>IFSC Code</Text>
                 <TextInput
                   style={[
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="e.g. Citi Bank, HDFC Bank, Chase"
+                  placeholder="e.g. SBIN0001234, HDFC0000060"
                   placeholderTextColor={theme.textDim}
-                  value={institutionName}
-                  onChangeText={setInstitutionName}
+                  autoCapitalize="characters"
+                  maxLength={11}
+                  value={ifscCode}
+                  onChangeText={(t) => setIfscCode(t.toUpperCase())}
                 />
               </View>
 
-              {/* Opening Balance & Last 4 digits */}
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Initial Balance ($)</Text>
-                  <TextInput
-                    style={[
-                      styles.formInput,
-                      { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
-                    ]}
-                    placeholder="1200.00"
-                    placeholderTextColor={theme.textDim}
-                    keyboardType="numeric"
-                    value={openingBalance}
-                    onChangeText={setOpeningBalance}
-                  />
-                </View>
-
-                <View style={[styles.formGroup, { flex: 1 }]}>
-                  <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Last 4 Digits</Text>
-                  <TextInput
-                    style={[
-                      styles.formInput,
-                      { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
-                    ]}
-                    placeholder="2880"
-                    placeholderTextColor={theme.textDim}
-                    maxLength={4}
-                    keyboardType="numeric"
-                    value={accountMask}
-                    onChangeText={setAccountMask}
-                  />
-                </View>
+              {/* Initial Balance */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: theme.textPrimary }]}>Initial Balance ($ / ₹)</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
+                  ]}
+                  placeholder="1200.00"
+                  placeholderTextColor={theme.textDim}
+                  keyboardType="numeric"
+                  value={openingBalance}
+                  onChangeText={setOpeningBalance}
+                />
               </View>
             </ScrollView>
 
@@ -562,7 +647,7 @@ export default function AccountSelectionScreen({
               {creating ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.createAccountBtnText}>Create & Select Account</Text>
+                <Text style={styles.createAccountBtnText}>Create Account</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -886,5 +971,36 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  dropdownTrigger: {
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownTriggerText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dropdownMenu: {
+    marginTop: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+  },
+  dropdownItemText: {
+    fontSize: 14,
   },
 });
