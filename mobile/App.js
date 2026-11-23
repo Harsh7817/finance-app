@@ -61,7 +61,7 @@ export default function App() {
   // Data & API states
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [userProfile, setUserProfile] = useState({ name: 'Arya Wijaya', email: 'arya.wijaya@walley.app' });
+  const [userProfile, setUserProfile] = useState({ name: '', email: '' });
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [overview, setOverview] = useState(null);
@@ -85,8 +85,16 @@ export default function App() {
     const savedToken = await getToken();
     if (savedToken) {
       setToken(savedToken);
+      api.getMe().then((me) => {
+        if (me?.user?.email) {
+          const username = me.user.email.split('@')[0];
+          setUserProfile({
+            name: username.charAt(0).toUpperCase() + username.slice(1),
+            email: me.user.email,
+          });
+        }
+      }).catch(() => null);
       fetchDashboardData();
-      // On app start with existing token, prompt account selection if not yet chosen
       if (!selectedAccount) {
         setCurrentScreen('selectAccount');
       }
@@ -121,11 +129,16 @@ export default function App() {
   // Called when user logs in or registers
   const handleAuthSuccess = (jwt, user) => {
     setToken(jwt);
-    if (user?.name) {
+    if (user?.email) {
+      const username = user.email.split('@')[0];
+      setUserProfile({
+        name: username.charAt(0).toUpperCase() + username.slice(1),
+        email: user.email,
+      });
+    } else if (user?.name) {
       setUserProfile((prev) => ({ ...prev, ...user }));
     }
     fetchDashboardData();
-    // Requirement: after logging in, the user sees the page listing all accounts
     setSelectedAccount(null);
     setCurrentScreen('selectAccount');
   };
@@ -462,6 +475,8 @@ export default function App() {
           <StatisticScreen
             theme={theme}
             onNavigate={navigateTo}
+            overview={overview}
+            balance={currentBalance}
           />
         )}
 
@@ -506,27 +521,16 @@ export default function App() {
             onConfirm={async () => {
               setLoading(true);
               try {
-                // Record transaction
-                await api.createTransaction({
-                  merchantName: `Transfer to ${transferFlowData?.payee?.name || 'Contact'}`,
-                  amount: parseFloat(transferFlowData?.amount || 275),
-                  type: 'DEBIT',
-                  accountId: selectedAccount?.id,
-                }).catch(() => null);
-
-                // Add to local state
-                setTransactions((prev) => [
-                  {
-                    id: 'tx_transfer_' + Date.now(),
+                const amountVal = parseFloat(transferFlowData?.amount || 0);
+                if (selectedAccount?.id) {
+                  await api.createTransaction({
                     merchantName: `Transfer to ${transferFlowData?.payee?.name || 'Contact'}`,
-                    amount: parseFloat(transferFlowData?.amount || 275),
+                    amount: amountVal,
                     type: 'DEBIT',
-                    transactionAt: new Date().toISOString(),
-                    category: { name: 'Transfer' },
-                  },
-                  ...prev,
-                ]);
-
+                    accountId: selectedAccount.id,
+                  });
+                }
+                await fetchDashboardData();
                 navigateTo('transferSuccess');
               } catch (err) {
                 Alert.alert('Transfer Error', err.message);
@@ -569,13 +573,29 @@ export default function App() {
             theme={theme}
             category={selectedBillCategory}
             onBack={() => navigateTo('billPay')}
-            onPaySuccess={(billDetails) => {
-              setTransferFlowData({
-                payee: { name: billDetails.provider },
-                amount: billDetails.amount,
-                message: `Bill Token: ${billDetails.token}`,
-              });
-              navigateTo('transferSuccess');
+            onPaySuccess={async (billDetails) => {
+              setLoading(true);
+              try {
+                if (selectedAccount?.id) {
+                  await api.createTransaction({
+                    merchantName: `${billDetails.provider || 'Bill Payment'}`,
+                    amount: parseFloat(billDetails.amount || 0),
+                    type: 'DEBIT',
+                    accountId: selectedAccount.id,
+                  });
+                }
+                await fetchDashboardData();
+                setTransferFlowData({
+                  payee: { name: billDetails.provider },
+                  amount: billDetails.amount,
+                  message: `Bill Token: ${billDetails.token}`,
+                });
+                navigateTo('transferSuccess');
+              } catch (err) {
+                Alert.alert('Bill Payment Error', err.message);
+              } finally {
+                setLoading(false);
+              }
             }}
           />
         )}

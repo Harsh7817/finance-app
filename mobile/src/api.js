@@ -126,9 +126,10 @@ export const api = {
   getDataSources: () => apiRequest('/financial/sources'),
   createDataSource: (data) => apiRequest('/financial/sources', { method: 'POST', body: JSON.stringify(data) }),
 
-  // Transactions
+  // Transactions & Transfers
   getTransactions: (queryString = '') => apiRequest(`/transactions${queryString}`),
   createTransaction: (data) => apiRequest('/transactions', { method: 'POST', body: JSON.stringify(data) }),
+  recordTransfer: (data) => apiRequest('/transactions/transfer', { method: 'POST', body: JSON.stringify(data) }),
   getCategories: () => apiRequest('/categories'),
 
   // CSV Statement Ingestion
@@ -137,7 +138,8 @@ export const api = {
   // Analytics
   getOverview: (timeframe = 'month') => apiRequest(`/analytics/overview?timeframe=${timeframe}`),
   getExpenses: (timeframe = 'month') => apiRequest(`/analytics/expenses?timeframe=${timeframe}`),
-  getVisualizations: (timeframe = 'month') => apiRequest(`/analytics/visualizations?timeframe=${timeframe}`),
+  getComparisons: () => apiRequest('/analytics/comparisons'),
+  getVisualizations: (months = 6) => apiRequest(`/analytics/visualizations?months=${months}`),
 
   // Budgets
   getBudgets: () => apiRequest('/budgets'),

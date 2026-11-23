@@ -10,11 +10,24 @@ import {
 import Svg, { Rect, Circle, G } from 'react-native-svg';
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, TrendingUp } from 'lucide-react-native';
 import { formatCurrency } from '../theme';
+import { api } from '../api';
 
 const { width } = Dimensions.get('window');
 
-export default function StatisticScreen({ theme, onNavigate }) {
+export default function StatisticScreen({ theme, onNavigate, overview, balance = 0 }) {
   const [selectedPeriod, setSelectedPeriod] = useState('M'); // 'D' | 'W' | 'M' | 'Y'
+  const [analyticsData, setAnalyticsData] = useState(null);
+
+  useEffect(() => {
+    let timeframe = 'month';
+    if (selectedPeriod === 'D') timeframe = 'today';
+    else if (selectedPeriod === 'W') timeframe = 'week';
+    else if (selectedPeriod === 'Y') timeframe = 'year';
+
+    api.getOverview(timeframe)
+      .then((data) => setAnalyticsData(data))
+      .catch(() => null);
+  }, [selectedPeriod]);
 
   const periods = [
     { id: 'D', label: 'Day' },
@@ -23,13 +36,17 @@ export default function StatisticScreen({ theme, onNavigate }) {
     { id: 'Y', label: 'Year' },
   ];
 
-  // Bar chart data matching Image 1 (Aug, Sep, Oct, Nov, Dec)
+  const totalBalance = balance || (analyticsData?.cashFlow?.netCashFlow !== undefined ? analyticsData.cashFlow.netCashFlow : 0);
+  const totalIncome = analyticsData?.cashFlow?.totalIncome !== undefined ? analyticsData.cashFlow.totalIncome : (overview?.cashFlow?.totalIncome || 0);
+  const totalExpense = analyticsData?.cashFlow?.totalExpenses !== undefined ? analyticsData.cashFlow.totalExpenses : (overview?.cashFlow?.totalExpenses || 0);
+
+  // Dynamic bar height scaling based on actual figures
+  const maxVal = Math.max(totalIncome, totalExpense, 1);
+  const incomeHeight = Math.max(12, Math.min(140, Math.round((totalIncome / maxVal) * 140)));
+  const expenseHeight = Math.max(12, Math.min(140, Math.round((totalExpense / maxVal) * 140)));
+
   const barData = [
-    { label: 'Aug', incomeH: 90, expenseH: 60 },
-    { label: 'Sep', incomeH: 120, expenseH: 80 },
-    { label: 'Oct', incomeH: 70, expenseH: 50 },
-    { label: 'Nov', incomeH: 140, expenseH: 95, active: true },
-    { label: 'Dec', incomeH: 110, expenseH: 75 },
+    { label: selectedPeriod === 'M' ? 'Current' : selectedPeriod, incomeH: incomeHeight, expenseH: expenseHeight, active: true },
   ];
 
   // Donut chart spending categories
@@ -52,7 +69,7 @@ export default function StatisticScreen({ theme, onNavigate }) {
         <View style={styles.balanceSection}>
           <Text style={[styles.balanceLabel, { color: theme.textMuted }]}>Total Balance</Text>
           <View style={styles.balanceRow}>
-            <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>₹12,549.00</Text>
+            <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>{formatCurrency(totalBalance)}</Text>
 
             {/* D / W / M / Y Selector */}
             <View style={[styles.periodToggle, { backgroundColor: theme.surfaceAlt }]}>
@@ -146,7 +163,7 @@ export default function StatisticScreen({ theme, onNavigate }) {
             </View>
             <View>
               <Text style={[styles.metricLabel, { color: theme.textMuted }]}>Income</Text>
-              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>₹5,448</Text>
+              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>{formatCurrency(totalIncome)}</Text>
             </View>
           </View>
 
@@ -163,7 +180,7 @@ export default function StatisticScreen({ theme, onNavigate }) {
             </View>
             <View>
               <Text style={[styles.metricLabel, { color: theme.textMuted }]}>Expense</Text>
-              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>₹3,205</Text>
+              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>{formatCurrency(totalExpense)}</Text>
             </View>
           </View>
         </View>

@@ -14,18 +14,26 @@ import { formatCurrency } from '../theme';
 
 export default function WalletScreen({
   theme,
-  balance = 1200.82,
+  balance = 0,
   accounts = [],
   onNavigate,
 }) {
   const [selectedCardIdx, setSelectedCardIdx] = useState(0);
 
-  const walletCards = [
-    { id: 'wc1', name: 'Arya Wijaya', number: '**** **** 2880', balance: balance, expiry: '11/24', variant: 'blue' },
-    { id: 'wc2', name: 'Arya Wijaya', number: '**** **** 8820', balance: 5420.5, expiry: '09/26', variant: 'cyan' },
-  ];
+  const walletCards = accounts && accounts.length > 0
+    ? accounts.map((acc, i) => ({
+        id: acc.id,
+        name: acc.accountName || 'Account',
+        number: acc.accountMask ? `**** **** ${acc.accountMask}` : '**** **** ----',
+        balance: Number(acc.cachedBalance || 0),
+        expiry: '12/28',
+        variant: i % 2 === 0 ? 'blue' : 'cyan',
+      }))
+    : [
+        { id: 'wc1', name: 'Primary Account', number: '**** **** ----', balance: balance, expiry: '12/28', variant: 'blue' }
+      ];
 
-  const current = walletCards[selectedCardIdx];
+  const current = walletCards[selectedCardIdx] || walletCards[0];
 
   const spendingCategories = [
     { name: 'Grocery', pct: 35, color: theme.accentCyan, amount: '₹4,200' },
