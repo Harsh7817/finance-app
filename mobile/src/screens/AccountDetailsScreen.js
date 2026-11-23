@@ -171,10 +171,17 @@ export default function AccountDetailsScreen({
                 onPress={() => onSelectAccount && onSelectAccount(acc)}
                 activeOpacity={0.85}
               >
-                {/* Account type label */}
-                <Text style={[styles.cardTypeLabel, { color: theme.textMuted }]}>
-                  {getAccountTypeLabel(acc.accountType)}
-                </Text>
+                {/* Account type label & holder */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.cardTypeLabel, { color: theme.textMuted }]}>
+                    {getAccountTypeLabel(acc.accountType)}
+                  </Text>
+                  {acc.accountName && (
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textMuted }}>
+                      {acc.accountName}
+                    </Text>
+                  )}
+                </View>
 
                 {/* Mask + eye + balance + chevron row */}
                 <View style={styles.cardMainRow}>
@@ -203,11 +210,11 @@ export default function AccountDetailsScreen({
                   </View>
                 </View>
 
-                {/* Institution badge */}
+                {/* Institution & IFSC badge */}
                 <View style={[styles.institutionBadge, { backgroundColor: theme.primarySoft }]}>
                   <IconComp size={12} color={theme.primary} />
                   <Text style={[styles.institutionText, { color: theme.primary }]}>
-                    {acc.institutionName || 'Bank'}
+                    {acc.institutionName || 'Bank'}{acc.ifscCode ? ` • IFSC: ${acc.ifscCode}` : ''}
                   </Text>
                 </View>
               </TouchableOpacity>
