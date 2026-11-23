@@ -24,7 +24,7 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
-  MoreHorizontal,
+  MoreVertical,
   Trash2,
 } from 'lucide-react-native';
 import WalleyLogo from '../components/WalleyLogo';
@@ -44,6 +44,7 @@ export default function AccountSelectionScreen({
   const [showAddModal, setShowAddModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [menuAccount, setMenuAccount] = useState(null);
+  const [showMenuModal, setShowMenuModal] = useState(false);
 
   // New Account Form State
   const [accountName, setAccountName] = useState('');
@@ -199,36 +200,44 @@ export default function AccountSelectionScreen({
     }
   };
 
-  const handleRequestDelete = (acc) => {
-    setMenuAccount(null);
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete the account?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => confirmDeleteAccount(acc.id),
-        },
-      ]
-    );
+  const handleOpenAccountMenu = (acc) => {
+    setMenuAccount(acc);
+    setShowMenuModal(true);
   };
 
-  const confirmDeleteAccount = async (accId) => {
-    try {
-      await api.deleteAccount(accId).catch(() => null);
-    } catch {
-      // offline safe
+  const handleRequestDelete = () => {
+    const accToDelete = menuAccount;
+    setShowMenuModal(false);
+    setTimeout(() => {
+      Alert.alert(
+        'Delete Account',
+        'Are you sure you want to delete the account?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => confirmDeleteAccount(accToDelete),
+          },
+        ],
+        { cancelable: true }
+      );
+    }, 120);
+  };
+
+  const confirmDeleteAccount = (accToDelete) => {
+    if (!accToDelete) return;
+    const remaining = accounts.filter((a) => a.id !== accToDelete.id);
+    setAccounts(remaining);
+    if (selectedAccountId === accToDelete.id) {
+      setSelectedAccountId(remaining[0]?.id || null);
     }
-    setAccounts((prev) => prev.filter((a) => a.id !== accId));
-    if (selectedAccountId === accId) {
-      setSelectedAccountId(null);
-    }
-    Alert.alert('Account Deleted', 'The account has been successfully removed.');
+    setMenuAccount(null);
+    api.deleteAccount(accToDelete.id).catch(() => null);
+    Alert.alert('Account Deleted', `"${accToDelete.accountName}" has been successfully deleted.`);
   };
 
   const getAccountIcon = (type) => {
@@ -331,7 +340,7 @@ export default function AccountSelectionScreen({
                     const IconComponent = getAccountIcon(acc.accountType);
 
                     return (
-                      <TouchableOpacity
+                      <View
                         key={acc.id}
                         style={[
                           styles.accountCard,
@@ -342,41 +351,16 @@ export default function AccountSelectionScreen({
                           },
                           isSelected ? theme.cardShadow : theme.cardShadowSoft,
                         ]}
-                        onPress={() => {
-                          setSelectedAccountId(acc.id);
-                          onSelectAccount(acc);
-                        }}
-                        activeOpacity={0.88}
                       >
-                        {/* Top Row: Three Dots on top-left & Radio on top-right */}
-                        <View style={styles.cardTopRow}>
-                          <TouchableOpacity
-                            style={styles.cardThreeDotBtn}
-                            onPress={(e) => {
-                              e?.stopPropagation?.();
-                              handleOpenAccountMenu(acc);
-                            }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            activeOpacity={0.7}
-                          >
-                            <MoreHorizontal size={18} color={theme.textMuted} />
-                          </TouchableOpacity>
-
-                          <View
-                            style={[
-                              styles.radioCircle,
-                              {
-                                borderColor: isSelected ? theme.primary : theme.border,
-                                backgroundColor: isSelected ? theme.primary : 'transparent',
-                              },
-                            ]}
-                          >
-                            {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
-                          </View>
-                        </View>
-
-                        {/* Main Body Row: Icon + Details + Balance */}
-                        <View style={styles.cardBodyRow}>
+                        {/* Main selectable area */}
+                        <TouchableOpacity
+                          style={styles.accCardContent}
+                          onPress={() => {
+                            setSelectedAccountId(acc.id);
+                            onSelectAccount(acc);
+                          }}
+                          activeOpacity={0.88}
+                        >
                           {/* Left Icon */}
                           <View
                             style={[
@@ -436,7 +420,7 @@ export default function AccountSelectionScreen({
                             </View>
                           </View>
 
-                          {/* Right: Balance */}
+                          {/* Right: Balance & Check Radio */}
                           <View style={styles.accRightCol}>
                             <Text
                               style={[
@@ -446,9 +430,31 @@ export default function AccountSelectionScreen({
                             >
                               {formatCurrency(acc.cachedBalance || 0, acc.currency || 'USD')}
                             </Text>
+
+                            <View
+                              style={[
+                                styles.radioCircle,
+                                {
+                                  borderColor: isSelected ? theme.primary : theme.border,
+                                  backgroundColor: isSelected ? theme.primary : 'transparent',
+                                },
+                              ]}
+                            >
+                              {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                            </View>
                           </View>
-                        </View>
-                      </TouchableOpacity>
+                        </TouchableOpacity>
+
+                        {/* Three Vertical Dots on the right side */}
+                        <TouchableOpacity
+                          style={styles.threeDotsBtn}
+                          onPress={() => handleOpenAccountMenu(acc)}
+                          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                          activeOpacity={0.7}
+                        >
+                          <MoreVertical size={18} color={theme.textMuted} strokeWidth={2.4} />
+                        </TouchableOpacity>
+                      </View>
                     );
                   })}
                 </View>
@@ -707,17 +713,17 @@ export default function AccountSelectionScreen({
         </View>
       </Modal>
 
-      {/* Account Options Menu Modal */}
+      {/* Account Options Menu Modal (triggered by 3-dots) */}
       <Modal
-        visible={!!menuAccount}
+        visible={showMenuModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setMenuAccount(null)}
+        onRequestClose={() => setShowMenuModal(false)}
       >
         <TouchableOpacity
           style={styles.menuOverlay}
           activeOpacity={1}
-          onPress={() => setMenuAccount(null)}
+          onPress={() => setShowMenuModal(false)}
         >
           <View
             style={[
@@ -726,36 +732,48 @@ export default function AccountSelectionScreen({
               theme.cardShadow,
             ]}
           >
-            <View style={styles.menuHeader}>
-              <Text style={[styles.menuTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                {menuAccount?.accountName}
-              </Text>
-              <Text style={[styles.menuSub, { color: theme.textMuted }]}>
-                {menuAccount?.institutionName} • {menuAccount?.accountType || 'SAVINGS'}
-              </Text>
-            </View>
-
-            {/* Delete Option */}
-            <TouchableOpacity
-              style={styles.deleteOptionBtn}
-              onPress={() => handleRequestDelete(menuAccount)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.deleteIconBox}>
-                <Trash2 size={18} color="#EF4444" strokeWidth={2.2} />
+            <View style={styles.menuCardHeader}>
+              <View style={[styles.menuIconCircle, { backgroundColor: theme.primarySoft }]}>
+                <Landmark size={20} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.deleteOptionText}>Delete Account</Text>
-                <Text style={[styles.deleteOptionSub, { color: theme.textMuted }]}>
-                  Remove this account from Walley
+                <Text style={[styles.menuAccountName, { color: theme.textPrimary }]} numberOfLines={1}>
+                  {menuAccount?.accountName}
+                </Text>
+                <Text style={[styles.menuAccountSub, { color: theme.textMuted }]}>
+                  {menuAccount?.institutionName} • {menuAccount?.accountMask || '**** 2880'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.menuCloseBtn}
+                onPress={() => setShowMenuModal(false)}
+              >
+                <X size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.menuDivider} />
+
+            {/* Delete Account Option */}
+            <TouchableOpacity
+              style={styles.menuActionItem}
+              onPress={handleRequestDelete}
+              activeOpacity={0.7}
+            >
+              <View style={styles.deleteIconBox}>
+                <Trash2 size={18} color="#EF4444" strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.deleteActionText}>Delete Account</Text>
+                <Text style={[styles.deleteActionSub, { color: theme.textMuted }]}>
+                  Remove this account from your profile
                 </Text>
               </View>
             </TouchableOpacity>
 
-            {/* Cancel Button */}
             <TouchableOpacity
-              style={[styles.menuCancelBtn, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
-              onPress={() => setMenuAccount(null)}
+              style={[styles.menuCancelBtn, { backgroundColor: theme.surfaceAlt }]}
+              onPress={() => setShowMenuModal(false)}
               activeOpacity={0.8}
             >
               <Text style={[styles.menuCancelText, { color: theme.textPrimary }]}>Cancel</Text>
@@ -853,26 +871,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   accountCard: {
-    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 6,
     borderRadius: 20,
   },
-  cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  cardThreeDotBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardBodyRow: {
+  accCardContent: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  threeDotsBtn: {
+    width: 36,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   accIconCircle: {
     width: 48,
@@ -1130,66 +1146,82 @@ const styles = StyleSheet.create({
   },
   menuOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
   },
   menuCard: {
-    width: '100%',
-    borderRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
-    padding: 22,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     gap: 16,
   },
-  menuHeader: {
-    gap: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
-    paddingBottom: 12,
+  menuCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  menuTitle: {
-    fontSize: 18,
+  menuIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuAccountName: {
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: -0.3,
   },
-  menuSub: {
-    fontSize: 13,
+  menuAccountSub: {
+    fontSize: 12,
+    marginTop: 2,
   },
-  deleteOptionBtn: {
+  menuCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  menuActionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: '#FEF2F2',
   },
   deleteIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#FEF2F2',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  deleteOptionText: {
-    fontSize: 15,
-    fontWeight: '700',
+  deleteActionText: {
     color: '#EF4444',
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: '800',
   },
-  deleteOptionSub: {
+  deleteActionSub: {
     fontSize: 12,
+    marginTop: 2,
   },
   menuCancelBtn: {
-    height: 46,
+    height: 48,
     borderRadius: 14,
-    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
   },
   menuCancelText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
 });
