@@ -57,6 +57,7 @@ export default function App() {
   // Navigation State: 'selectAccount' | 'home' | 'statistic' | 'wallet' | 'profile' | 'transfer' | etc.
   const [currentScreen, setCurrentScreen] = useState('selectAccount');
   const [activeTab, setActiveTab] = useState('home');
+  const [returnScreen, setReturnScreen] = useState('home');
 
   // Data & API states
   const [loading, setLoading] = useState(false);
@@ -144,7 +145,12 @@ export default function App() {
     setActiveTab('home');
   };
 
-  const navigateTo = (screen) => {
+  const navigateTo = (screen, returnTo = null) => {
+    if (returnTo) {
+      setReturnScreen(returnTo);
+    } else if (['home', 'statistic', 'wallet', 'profile'].includes(currentScreen)) {
+      setReturnScreen(currentScreen);
+    }
     setCurrentScreen(screen);
     if (['home', 'statistic', 'wallet', 'profile'].includes(screen)) {
       setActiveTab(screen);
@@ -481,6 +487,8 @@ export default function App() {
             onToggleTheme={() => setIsDark(!isDark)}
             userName={userProfile.name}
             userEmail={userProfile.email}
+            selectedAccount={selectedAccount}
+            accounts={accounts}
             onLogout={handleLogout}
             onNavigate={navigateTo}
           />
@@ -596,11 +604,11 @@ export default function App() {
             userName={userProfile.name}
             selectedAccount={selectedAccount}
             accounts={accounts}
-            onBack={() => navigateTo('home')}
+            onBack={() => navigateTo(returnScreen || 'home')}
             onAddAccount={() => navigateTo('selectAccount')}
             onSelectAccount={(acc) => {
               setSelectedAccount(acc);
-              navigateTo('home');
+              navigateTo(returnScreen || 'home');
             }}
           />
         )}
