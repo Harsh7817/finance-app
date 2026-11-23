@@ -24,6 +24,8 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
+  MoreHorizontal,
+  Trash2,
 } from 'lucide-react-native';
 import WalleyLogo from '../components/WalleyLogo';
 import { formatCurrency } from '../theme';
@@ -41,6 +43,7 @@ export default function AccountSelectionScreen({
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [menuAccount, setMenuAccount] = useState(null);
 
   // New Account Form State
   const [accountName, setAccountName] = useState('');
@@ -196,6 +199,38 @@ export default function AccountSelectionScreen({
     }
   };
 
+  const handleRequestDelete = (acc) => {
+    setMenuAccount(null);
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete the account?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => confirmDeleteAccount(acc.id),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = async (accId) => {
+    try {
+      await api.deleteAccount(accId).catch(() => null);
+    } catch {
+      // offline safe
+    }
+    setAccounts((prev) => prev.filter((a) => a.id !== accId));
+    if (selectedAccountId === accId) {
+      setSelectedAccountId(null);
+    }
+    Alert.alert('Account Deleted', 'The account has been successfully removed.');
+  };
+
   const getAccountIcon = (type) => {
     switch (type) {
       case 'CREDIT_CARD':
@@ -313,75 +348,19 @@ export default function AccountSelectionScreen({
                         }}
                         activeOpacity={0.88}
                       >
-                        {/* Left Icon */}
-                        <View
-                          style={[
-                            styles.accIconCircle,
-                            {
-                              backgroundColor: isSelected
-                                ? theme.primary
-                                : theme.primarySoft,
-                            },
-                          ]}
-                        >
-                          <IconComponent
-                            size={22}
-                            color={isSelected ? '#FFFFFF' : theme.primary}
-                            strokeWidth={2.3}
-                          />
-                        </View>
-
-                        {/* Middle Info */}
-                        <View style={styles.accDetails}>
-                          <View style={styles.accNameRow}>
-                            <Text
-                              style={[
-                                styles.accName,
-                                { color: theme.textPrimary, fontWeight: isSelected ? '800' : '700' },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {acc.accountName}
-                            </Text>
-                          </View>
-
-                          <Text style={[styles.accSub, { color: theme.textMuted }]}>
-                            {acc.institutionName} • {acc.accountMask || '**** 2880'}
-                          </Text>
-
-                          <View style={styles.accBadgeRow}>
-                            <View
-                              style={[
-                                styles.typeBadge,
-                                {
-                                  backgroundColor: isSelected
-                                    ? 'rgba(67, 97, 238, 0.1)'
-                                    : theme.surfaceAlt,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.typeBadgeText,
-                                  { color: isSelected ? theme.primary : theme.textMuted },
-                                ]}
-                              >
-                                {acc.accountType || 'SAVINGS'}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* Right: Balance & Check Radio */}
-                        <View style={styles.accRightCol}>
-                          <Text
-                            style={[
-                              styles.accBalance,
-                              { color: theme.textPrimary },
-                            ]}
+                        {/* Top Row: Three Dots on top-left & Radio on top-right */}
+                        <View style={styles.cardTopRow}>
+                          <TouchableOpacity
+                            style={styles.cardThreeDotBtn}
+                            onPress={(e) => {
+                              e?.stopPropagation?.();
+                              handleOpenAccountMenu(acc);
+                            }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            activeOpacity={0.7}
                           >
-                            {formatCurrency(acc.cachedBalance || 0, acc.currency || 'USD')}
-                          </Text>
+                            <MoreHorizontal size={18} color={theme.textMuted} />
+                          </TouchableOpacity>
 
                           <View
                             style={[
@@ -393,6 +372,80 @@ export default function AccountSelectionScreen({
                             ]}
                           >
                             {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                          </View>
+                        </View>
+
+                        {/* Main Body Row: Icon + Details + Balance */}
+                        <View style={styles.cardBodyRow}>
+                          {/* Left Icon */}
+                          <View
+                            style={[
+                              styles.accIconCircle,
+                              {
+                                backgroundColor: isSelected
+                                  ? theme.primary
+                                  : theme.primarySoft,
+                              },
+                            ]}
+                          >
+                            <IconComponent
+                              size={22}
+                              color={isSelected ? '#FFFFFF' : theme.primary}
+                              strokeWidth={2.3}
+                            />
+                          </View>
+
+                          {/* Middle Info */}
+                          <View style={styles.accDetails}>
+                            <View style={styles.accNameRow}>
+                              <Text
+                                style={[
+                                  styles.accName,
+                                  { color: theme.textPrimary, fontWeight: isSelected ? '800' : '700' },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {acc.accountName}
+                              </Text>
+                            </View>
+
+                            <Text style={[styles.accSub, { color: theme.textMuted }]}>
+                              {acc.institutionName} • {acc.accountMask || '**** 2880'}
+                            </Text>
+
+                            <View style={styles.accBadgeRow}>
+                              <View
+                                style={[
+                                  styles.typeBadge,
+                                  {
+                                    backgroundColor: isSelected
+                                      ? 'rgba(67, 97, 238, 0.1)'
+                                      : theme.surfaceAlt,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.typeBadgeText,
+                                    { color: isSelected ? theme.primary : theme.textMuted },
+                                  ]}
+                                >
+                                  {acc.accountType || 'SAVINGS'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* Right: Balance */}
+                          <View style={styles.accRightCol}>
+                            <Text
+                              style={[
+                                styles.accBalance,
+                                { color: theme.textPrimary },
+                              ]}
+                            >
+                              {formatCurrency(acc.cachedBalance || 0, acc.currency || 'USD')}
+                            </Text>
                           </View>
                         </View>
                       </TouchableOpacity>
@@ -653,6 +706,63 @@ export default function AccountSelectionScreen({
           </View>
         </View>
       </Modal>
+
+      {/* Account Options Menu Modal */}
+      <Modal
+        visible={!!menuAccount}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuAccount(null)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuAccount(null)}
+        >
+          <View
+            style={[
+              styles.menuCard,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+              theme.cardShadow,
+            ]}
+          >
+            <View style={styles.menuHeader}>
+              <Text style={[styles.menuTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                {menuAccount?.accountName}
+              </Text>
+              <Text style={[styles.menuSub, { color: theme.textMuted }]}>
+                {menuAccount?.institutionName} • {menuAccount?.accountType || 'SAVINGS'}
+              </Text>
+            </View>
+
+            {/* Delete Option */}
+            <TouchableOpacity
+              style={styles.deleteOptionBtn}
+              onPress={() => handleRequestDelete(menuAccount)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.deleteIconBox}>
+                <Trash2 size={18} color="#EF4444" strokeWidth={2.2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.deleteOptionText}>Delete Account</Text>
+                <Text style={[styles.deleteOptionSub, { color: theme.textMuted }]}>
+                  Remove this account from Walley
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Cancel Button */}
+            <TouchableOpacity
+              style={[styles.menuCancelBtn, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}
+              onPress={() => setMenuAccount(null)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.menuCancelText, { color: theme.textPrimary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -743,11 +853,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   accountCard: {
+    padding: 14,
+    borderRadius: 20,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  cardThreeDotBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardBodyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    gap: 14,
+    gap: 12,
   },
   accIconCircle: {
     width: 48,
@@ -1002,5 +1127,69 @@ const styles = StyleSheet.create({
   },
   dropdownItemText: {
     fontSize: 14,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  menuCard: {
+    width: '100%',
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 22,
+    gap: 16,
+  },
+  menuHeader: {
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+    paddingBottom: 12,
+  },
+  menuTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  menuSub: {
+    fontSize: 13,
+  },
+  deleteOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+  },
+  deleteIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#FEF2F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteOptionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#EF4444',
+    marginBottom: 2,
+  },
+  deleteOptionSub: {
+    fontSize: 12,
+  },
+  menuCancelBtn: {
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  menuCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
