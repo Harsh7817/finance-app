@@ -273,7 +273,6 @@ export default function AccountDetailsScreen({
                     </View>
                   ) : null}
                 </View>
-                </View>
               </View>
             );
           })}
