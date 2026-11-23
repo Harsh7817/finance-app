@@ -120,7 +120,7 @@ export default function RequestScreen({
                   style={styles.contactItem}
                   onPress={() => {
                     setSelectedContact(c);
-                    Alert.alert('Request Sent', `A payment invoice of $275.00 has been sent to ${c.name}.`);
+                    Alert.alert('Request Sent', `A payment invoice of ₹275.00 has been sent to ${c.name}.`);
                   }}
                   activeOpacity={0.8}
                 >

@@ -60,7 +60,7 @@ export default function BillPayScreen({
           <View style={styles.dueCardTop}>
             <View>
               <Text style={[styles.dueLabel, { color: theme.textMuted }]}>Total Bill Due</Text>
-              <Text style={[styles.dueAmount, { color: theme.textPrimary }]}>$20.00</Text>
+              <Text style={[styles.dueAmount, { color: theme.textPrimary }]}>₹200.00</Text>
             </View>
             <View style={styles.dueIconsGroup}>
               <View style={[styles.miniCircle, { backgroundColor: theme.primarySoft }]}>

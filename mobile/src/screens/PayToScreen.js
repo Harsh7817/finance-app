@@ -120,7 +120,7 @@ export default function PayToScreen({
               theme.cardShadowSoft,
             ]}
           >
-            <Text style={[styles.currencyPrefix, { color: theme.primary }]}>$</Text>
+            <Text style={[styles.currencyPrefix, { color: theme.primary }]}>₹</Text>
             <TextInput
               style={[styles.amountInput, { color: theme.textPrimary }]}
               value={amount}

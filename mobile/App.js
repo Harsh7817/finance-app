@@ -670,7 +670,7 @@ export default function App() {
 
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
-              placeholder="Amount ($ or ₹)"
+              placeholder="Amount (₹)"
               placeholderTextColor={theme.textDim}
               keyboardType="decimal-pad"
               value={txForm.amount}
@@ -703,7 +703,7 @@ export default function App() {
             />
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
-              placeholder="Monthly Limit Amount ($)"
+              placeholder="Monthly Limit Amount (₹)"
               placeholderTextColor={theme.textDim}
               keyboardType="decimal-pad"
               value={budgetForm.limitAmount}
@@ -735,7 +735,7 @@ export default function App() {
             />
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
-              placeholder="Target Amount ($)"
+              placeholder="Target Amount (₹)"
               placeholderTextColor={theme.textDim}
               keyboardType="decimal-pad"
               value={goalForm.targetAmount}

@@ -141,7 +141,7 @@ export default function TransferScreen({
               theme.cardShadowSoft,
             ]}
           >
-            <Text style={[styles.currencyPrefix, { color: theme.primary }]}>$</Text>
+            <Text style={[styles.currencyPrefix, { color: theme.primary }]}>₹</Text>
             <TextInput
               style={[styles.amountInput, { color: theme.textPrimary }]}
               value={amount}
@@ -174,7 +174,7 @@ export default function TransferScreen({
                       { color: active ? theme.primary : theme.textSecondary },
                     ]}
                   >
-                    ${c}
+                    ₹{c}
                   </Text>
                 </TouchableOpacity>
               );
