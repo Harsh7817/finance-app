@@ -84,21 +84,31 @@ export default function App() {
   const checkInitialAuth = async () => {
     const savedToken = await getToken();
     if (savedToken) {
-      setToken(savedToken);
-      api.getMe().then((me) => {
-        if (me?.user?.email) {
-          const username = me.user.email.split('@')[0];
-          setUserProfile({
-            name: username.charAt(0).toUpperCase() + username.slice(1),
-            email: me.user.email,
-          });
+      // Validate the token against the backend
+      try {
+        const me = await api.getMe();
+        if (me?.user?.id) {
+          setToken(savedToken);
+          if (me.user.email) {
+            const username = me.user.email.split('@')[0];
+            setUserProfile({
+              name: username.charAt(0).toUpperCase() + username.slice(1),
+              email: me.user.email,
+            });
+          }
+          fetchDashboardData();
+          if (!selectedAccount) {
+            setCurrentScreen('selectAccount');
+          }
+          return;
         }
-      }).catch(() => null);
-      fetchDashboardData();
-      if (!selectedAccount) {
-        setCurrentScreen('selectAccount');
+      } catch {
+        // Token is invalid/expired or user was deleted from DB -> purge and show login
+        await deleteToken();
       }
     }
+    // No valid token: force user to AuthScreen
+    setToken(null);
   };
 
   const fetchDashboardData = async () => {
