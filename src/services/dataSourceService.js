@@ -290,6 +290,41 @@ const getUserAccounts = async (userId) => {
   });
 };
 
+/**
+ * Soft delete a financial account and deactivate its data sources
+ * 
+ * @param {string} userId
+ * @param {string} accountId
+ */
+const deleteFinancialAccount = async (userId, accountId) => {
+  const account = await prisma.financialAccount.findFirst({
+    where: { id: accountId, userId, deletedAt: null },
+  });
+
+  if (!account) {
+    const error = new Error('Financial account not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // Deactivate associated data sources
+    await tx.dataSource.updateMany({
+      where: { accountId, userId },
+      data: { isActive: false },
+    });
+
+    // Mark account as deleted
+    return await tx.financialAccount.update({
+      where: { id: accountId },
+      data: {
+        deletedAt: new Date(),
+        status: 'CLOSED',
+      },
+    });
+  });
+};
+
 module.exports = {
   createDataSource,
   getUserDataSources,
@@ -297,6 +332,7 @@ module.exports = {
   updateDataSource,
   createFinancialAccount,
   getUserAccounts,
+  deleteFinancialAccount,
   VALID_SOURCE_TYPES,
   VALID_ACCOUNT_TYPES,
 };

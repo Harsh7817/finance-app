@@ -6,6 +6,7 @@ const {
   modifyDataSource,
   addAccount,
   listAccounts,
+  removeAccount,
 } = require('../controllers/dataSourceController');
 const { authenticate } = require('../middlewares/authMiddleware');
 const {
@@ -27,6 +28,7 @@ router.patch('/sources/:id', modifyDataSource);
 // Optional Financial Accounts Endpoints
 router.post('/accounts', validateFinancialAccountInput, addAccount);
 router.get('/accounts', listAccounts);
+router.delete('/accounts/:id', removeAccount);
 
 module.exports = router;
 

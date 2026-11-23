@@ -5,6 +5,7 @@ const {
   updateDataSource,
   createFinancialAccount,
   getUserAccounts,
+  deleteFinancialAccount,
 } = require('../services/dataSourceService');
 const { successResponse } = require('../utils/response');
 
@@ -111,6 +112,22 @@ const listAccounts = async (req, res, next) => {
   }
 };
 
+/**
+ * Controller to delete (soft-delete) a financial account
+ */
+const removeAccount = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await deleteFinancialAccount(req.user.id, id);
+    return successResponse(res, {
+      status: 200,
+      message: 'Financial account deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   addDataSource,
   listDataSources,
@@ -118,5 +135,6 @@ module.exports = {
   modifyDataSource,
   addAccount,
   listAccounts,
+  removeAccount,
 };
 

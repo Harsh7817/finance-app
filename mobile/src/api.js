@@ -122,7 +122,7 @@ export const api = {
   // Accounts & Data Sources
   getAccounts: () => apiRequest('/financial/accounts'),
   createAccount: (data) => apiRequest('/financial/accounts', { method: 'POST', body: JSON.stringify(data) }),
-  deleteAccount: (id) => apiRequest(`/financial/accounts/${id}`, { method: 'DELETE' }).catch(() => true),
+  deleteAccount: (id) => apiRequest(`/financial/accounts/${id}`, { method: 'DELETE' }),
   getDataSources: () => apiRequest('/financial/sources'),
   createDataSource: (data) => apiRequest('/financial/sources', { method: 'POST', body: JSON.stringify(data) }),
 

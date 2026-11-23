@@ -227,16 +227,20 @@ export default function AccountSelectionScreen({
     }, 120);
   };
 
-  const confirmDeleteAccount = (accToDelete) => {
+  const confirmDeleteAccount = async (accToDelete) => {
     if (!accToDelete) return;
-    const remaining = accounts.filter((a) => a.id !== accToDelete.id);
-    setAccounts(remaining);
-    if (selectedAccountId === accToDelete.id) {
-      setSelectedAccountId(remaining[0]?.id || null);
+    try {
+      await api.deleteAccount(accToDelete.id);
+      const remaining = accounts.filter((a) => a.id !== accToDelete.id);
+      setAccounts(remaining);
+      if (selectedAccountId === accToDelete.id) {
+        setSelectedAccountId(remaining[0]?.id || null);
+      }
+      setMenuAccount(null);
+      Alert.alert('Account Deleted', `"${accToDelete.accountName}" has been successfully deleted.`);
+    } catch (err) {
+      Alert.alert('Delete Failed', err.message || 'Could not delete the account. Please check your connection.');
     }
-    setMenuAccount(null);
-    api.deleteAccount(accToDelete.id).catch(() => null);
-    Alert.alert('Account Deleted', `"${accToDelete.accountName}" has been successfully deleted.`);
   };
 
   const getAccountIcon = (type) => {
