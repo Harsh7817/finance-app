@@ -48,7 +48,7 @@ export default function AccountSelectionScreen({
 
   // New Account Form State
   const [accountName, setAccountName] = useState('');
-  const [institutionName, setInstitutionName] = useState('State Bank of India (SBI)');
+  const [institutionName, setInstitutionName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountType, setAccountType] = useState('SAVINGS');
   const [openingBalance, setOpeningBalance] = useState('1200.00');
@@ -196,6 +196,7 @@ export default function AccountSelectionScreen({
 
       // Reset form
       setAccountName('');
+      setInstitutionName('');
       setAccountNumber('');
       setOpeningBalance('');
       setIfscCode('');
@@ -589,7 +590,7 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="e.g. Subhash Srija, Arya Wijaya"
+                  placeholder=""
                   placeholderTextColor={theme.textDim}
                   value={accountName}
                   onChangeText={setAccountName}
@@ -616,7 +617,7 @@ export default function AccountSelectionScreen({
                       { color: institutionName ? theme.textPrimary : theme.textDim },
                     ]}
                   >
-                    {institutionName || 'Select a Bank'}
+                    {institutionName || 'Select Bank'}
                   </Text>
                   {showBankDropdown ? (
                     <ChevronUp size={18} color={theme.primary} />
@@ -671,6 +672,7 @@ export default function AccountSelectionScreen({
                     </ScrollView>
                   </View>
                 )}
+                
               </View>
 
               {/* Account Number */}
@@ -697,7 +699,7 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="e.g. SBIN0001234, HDFC0000060"
+                  placeholder="e.g. SBIN0001234"
                   placeholderTextColor={theme.textDim}
                   autoCapitalize="characters"
                   maxLength={11}
@@ -714,7 +716,7 @@ export default function AccountSelectionScreen({
                     styles.formInput,
                     { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary },
                   ]}
-                  placeholder="1200.00"
+                  placeholder=""
                   placeholderTextColor={theme.textDim}
                   keyboardType="numeric"
                   value={openingBalance}
