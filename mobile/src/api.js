@@ -73,9 +73,10 @@ async function apiRequest(endpoint, options = {}) {
 
   const url = `${getApiBaseUrl()}${endpoint}`;
 
-  // 4.5-second timeout to prevent hanging on unreachable IPs
+  // Use longer timeout (25s) for file uploads and heavy batch processing, 8s for standard API requests
+  const timeoutMs = options.body instanceof FormData ? 25000 : 8000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 4500);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let response;
   try {
