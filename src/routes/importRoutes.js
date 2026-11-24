@@ -8,12 +8,19 @@ const router = express.Router();
 // Require authentication for all statement imports
 router.use(authenticate);
 
+const handleCsvUpload = (req, res, next) => {
+  if (req.is('multipart/form-data')) {
+    return uploadCsv.single('file')(req, res, next);
+  }
+  next();
+};
+
 /**
  * @route   POST /api/v1/imports/csv
- * @desc    Upload and process a CSV bank statement
+ * @desc    Upload and process a CSV bank statement (supports multipart form-data or JSON with csvContent)
  * @access  Protected
  */
-router.post('/csv', uploadCsv.single('file'), importCsvStatement);
+router.post('/csv', handleCsvUpload, importCsvStatement);
 
 /**
  * @route   GET /api/v1/imports/batches

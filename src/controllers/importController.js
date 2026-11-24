@@ -6,10 +6,19 @@ const { successResponse, errorResponse } = require('../utils/response');
  */
 const importCsvStatement = async (req, res, next) => {
   try {
-    if (!req.file) {
+    let fileBuffer;
+    let originalName = 'statement.csv';
+
+    if (req.file) {
+      fileBuffer = req.file.buffer;
+      originalName = req.file.originalname;
+    } else if (req.body && req.body.csvContent) {
+      fileBuffer = Buffer.from(req.body.csvContent, 'utf8');
+      originalName = req.body.fileName || 'statement.csv';
+    } else {
       return errorResponse(res, {
         status: 400,
-        message: 'No CSV file uploaded. Please provide a file with key "file".',
+        message: 'No CSV file or content provided. Please upload a file with key "file" or provide "csvContent" in JSON.',
       });
     }
 
@@ -17,15 +26,15 @@ const importCsvStatement = async (req, res, next) => {
     if (!sourceId) {
       return errorResponse(res, {
         status: 400,
-        message: 'sourceId is required in form-data to link the imported file to a DataSource',
+        message: 'sourceId is required to link the imported file to a DataSource',
       });
     }
 
     const result = await processCsvImport(
       req.user.id,
       sourceId,
-      req.file.buffer,
-      req.file.originalname
+      fileBuffer,
+      originalName
     );
 
     return successResponse(res, {

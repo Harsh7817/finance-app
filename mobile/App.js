@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
 import {
@@ -194,11 +195,11 @@ export default function App() {
   const navigateTo = (screen, returnTo = null) => {
     if (returnTo) {
       setReturnScreen(returnTo);
-    } else if (['home', 'statistic', 'wallet', 'profile'].includes(currentScreen)) {
+    } else if (['home', 'statistic', 'profile'].includes(currentScreen)) {
       setReturnScreen(currentScreen);
     }
     setCurrentScreen(screen);
-    if (['home', 'statistic', 'wallet', 'profile'].includes(screen)) {
+    if (['home', 'statistic', 'profile'].includes(screen)) {
       setActiveTab(screen);
     }
   };
@@ -286,28 +287,41 @@ export default function App() {
         fileName = `${fileName}.csv`;
       }
 
-      // Convert local file URI to standard Web Blob for modern Expo SDK 58 / WinterCG fetch compatibility
-      let filePayload;
+      // Modern React Native / Android file upload:
+      // Reading text content directly via FileSystem and sending as JSON completely avoids
+      // OkHttp multipart streaming / FormData URI serialization crashes on Android.
+      let importResult;
+      let textReadSuccess = false;
+
       try {
-        const fileRes = await fetch(file.uri);
-        filePayload = await fileRes.blob();
-      } catch {
-        filePayload = {
+        if (FileSystem && FileSystem.readAsStringAsync) {
+          const csvContent = await FileSystem.readAsStringAsync(file.uri, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          if (csvContent) {
+            importResult = await api.uploadCsvContent({
+              sourceId: csvSource.id,
+              csvContent,
+              fileName,
+            });
+            textReadSuccess = true;
+          }
+        }
+      } catch (readErr) {
+        console.warn('FileSystem text read failed, falling back to multipart FormData:', readErr);
+      }
+
+      if (!textReadSuccess) {
+        // Fallback for web or environments where FileSystem is unavailable
+        const formData = new FormData();
+        formData.append('sourceId', csvSource.id);
+        formData.append('file', {
           uri: file.uri,
           name: fileName,
           type: 'text/csv',
-        };
+        });
+        importResult = await api.uploadCsv(formData);
       }
-
-      const formData = new FormData();
-      formData.append('sourceId', csvSource.id);
-      if (typeof Blob !== 'undefined' && filePayload instanceof Blob) {
-        formData.append('file', filePayload, fileName);
-      } else {
-        formData.append('file', filePayload);
-      }
-
-      const importResult = await api.uploadCsv(formData);
 
       await fetchDashboardData();
 
@@ -354,9 +368,9 @@ export default function App() {
         ...txForm,
         amount: parseFloat(txForm.amount),
         accountId: selectedAccount?.id || accounts[0]?.id,
-      }).catch(() => null);
+      });
 
-      setTransactions([newTx, ...transactions]);
+      await fetchDashboardData();
       setActionModalType(null);
       setTxForm({ merchantName: '', amount: '', type: 'DEBIT' });
       Alert.alert('Success', 'Transaction successfully saved.');
@@ -425,7 +439,7 @@ export default function App() {
         : 1200.82);
 
   // Determine whether to display the bottom nav (only on primary tabs)
-  const isTabScreen = ['home', 'statistic', 'wallet', 'profile'].includes(currentScreen);
+  const isTabScreen = ['home', 'statistic', 'profile'].includes(currentScreen);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
@@ -486,6 +500,9 @@ export default function App() {
             onNavigate={navigateTo}
             overview={overview}
             balance={currentBalance}
+            transactions={transactions}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
           />
         )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,35 +6,67 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import Svg, { Rect, Circle, G } from 'react-native-svg';
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, TrendingUp } from 'lucide-react-native';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  TrendingUp,
+  Receipt,
+  ShoppingBag,
+  CreditCard,
+  Coffee,
+  Zap,
+} from 'lucide-react-native';
 import { formatCurrency } from '../theme';
 import { api } from '../api';
 
 const { width } = Dimensions.get('window');
 
-export default function StatisticScreen({ theme, onNavigate, overview, balance = 0 }) {
+export default function StatisticScreen({
+  theme,
+  onNavigate,
+  overview,
+  balance = 0,
+  transactions = [],
+  onRefresh,
+  refreshing = false,
+}) {
   const [selectedPeriod, setSelectedPeriod] = useState('M'); // 'D' | 'W' | 'M' | 'Y'
+  const [selectedBarIndex, setSelectedBarIndex] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [expenseData, setExpenseData] = useState(null);
   const [visualizationData, setVisualizationData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchStats = async (period) => {
     let timeframe = 'month';
-    if (selectedPeriod === 'D') timeframe = 'today';
-    else if (selectedPeriod === 'W') timeframe = 'week';
-    else if (selectedPeriod === 'Y') timeframe = 'year';
+    if (period === 'D') timeframe = 'today';
+    else if (period === 'W') timeframe = 'week';
+    else if (period === 'Y') timeframe = 'year';
 
-    Promise.all([
-      api.getOverview(timeframe).catch(() => null),
-      api.getExpenses(timeframe).catch(() => null),
-      api.getVisualizations(6).catch(() => null),
-    ]).then(([ov, exp, viz]) => {
+    setLoading(true);
+    try {
+      const [ov, exp, viz] = await Promise.all([
+        api.getOverview(timeframe).catch(() => null),
+        api.getExpenses(timeframe).catch(() => null),
+        api.getVisualizations(timeframe).catch(() => null),
+      ]);
+
       if (ov) setAnalyticsData(ov);
       if (exp) setExpenseData(exp);
       if (viz) setVisualizationData(viz);
-    });
+      setSelectedBarIndex(null);
+    } catch {
+      // Offline safe fallback
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats(selectedPeriod);
   }, [selectedPeriod]);
 
   const periods = [
@@ -44,34 +76,198 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
     { id: 'Y', label: 'Year' },
   ];
 
-  const totalBalance = balance || (analyticsData?.summary?.totalAccountBalance !== undefined ? analyticsData.summary.totalAccountBalance : (overview?.summary?.totalAccountBalance || 0));
-  const totalIncome = analyticsData?.summary?.totalIncome !== undefined ? analyticsData.summary.totalIncome : (overview?.summary?.totalIncome || 0);
-  const totalExpense = analyticsData?.summary?.totalExpenditure !== undefined ? analyticsData.summary.totalExpenditure : (overview?.summary?.totalExpenditure || 0);
+  // Helper to determine if a transaction belongs to the selected period
+  const isTxInSelectedPeriod = (tx, period) => {
+    if (!tx || !tx.transactionAt) return false;
+    const txDate = new Date(tx.transactionAt);
+    const now = new Date();
 
-  // Dynamic bar height scaling based on actual figures
-  const maxVal = Math.max(totalIncome, totalExpense, 1);
-  const incomeHeight = Math.max(12, Math.min(140, Math.round((totalIncome / maxVal) * 140)));
-  const expenseHeight = Math.max(12, Math.min(140, Math.round((totalExpense / maxVal) * 140)));
+    if (period === 'D') {
+      return (
+        txDate.getUTCFullYear() === now.getUTCFullYear() &&
+        txDate.getUTCMonth() === now.getUTCMonth() &&
+        txDate.getUTCDate() === now.getUTCDate()
+      );
+    } else if (period === 'W') {
+      const day = now.getUTCDay();
+      const diff = now.getUTCDate() - day + (day === 0 ? -6 : 1);
+      const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff, 0, 0, 0, 0));
+      const endOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff + 6, 23, 59, 59, 999));
+      return txDate >= startOfWeek && txDate <= endOfWeek;
+    } else if (period === 'Y') {
+      return txDate.getUTCFullYear() === now.getUTCFullYear();
+    } else {
+      // Month
+      return (
+        txDate.getUTCFullYear() === now.getUTCFullYear() &&
+        txDate.getUTCMonth() === now.getUTCMonth()
+      );
+    }
+  };
 
-  // Real monthly trend data if available from visualizations
-  const barData = Array.isArray(visualizationData?.monthlyTrendsChart) && visualizationData.monthlyTrendsChart.length > 0
-    ? visualizationData.monthlyTrendsChart.slice(-6).map((item) => {
-        const inc = Number(item.income || 0);
-        const exp = Number(item.expense || 0);
-        const mMax = Math.max(inc, exp, 1);
-        const monthLabel = item.month ? item.month.slice(5) : '';
-        return {
-          label: monthLabel,
-          incomeH: Math.max(12, Math.min(140, Math.round((inc / mMax) * 140))),
-          expenseH: Math.max(12, Math.min(140, Math.round((exp / mMax) * 140))),
-          active: true,
-        };
-      })
-    : [
-        { label: selectedPeriod === 'M' ? 'Current' : selectedPeriod, incomeH: incomeHeight, expenseH: expenseHeight, active: true },
-      ];
+  // Filter transactions matching the selected period
+  const periodTransactions = useMemo(() => {
+    if (!Array.isArray(transactions)) return [];
+    return transactions.filter((tx) => isTxInSelectedPeriod(tx, selectedPeriod));
+  }, [transactions, selectedPeriod]);
 
-  // Donut chart spending categories from real backend expense analytics
+  // Total balance: real balance or overview summary balance
+  const totalBalance =
+    balance ||
+    (analyticsData?.summary?.totalAccountBalance !== undefined
+      ? analyticsData.summary.totalAccountBalance
+      : overview?.summary?.totalAccountBalance || 0);
+
+  // Income and Expense for the selected timeframe
+  const totalIncome =
+    analyticsData?.summary?.totalIncome !== undefined
+      ? analyticsData.summary.totalIncome
+      : periodTransactions
+          .filter((t) => t.type === 'CREDIT' || t.type === 'REFUND')
+          .reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  const totalExpense =
+    analyticsData?.summary?.totalExpenditure !== undefined
+      ? analyticsData.summary.totalExpenditure
+      : periodTransactions
+          .filter((t) => t.type === 'DEBIT' || t.type === 'FEE')
+          .reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  // Compute Chart Bars: use backend visualizationData.chartBars if available, or generate from periodTransactions
+  const chartBars = useMemo(() => {
+    if (Array.isArray(visualizationData?.chartBars) && visualizationData.chartBars.length > 0) {
+      return visualizationData.chartBars;
+    }
+
+    // Client-side fallback computation
+    const now = new Date();
+    if (selectedPeriod === 'D') {
+      const labels = ['12am', '4am', '8am', '12pm', '4pm', '8pm'];
+      const currentHour = now.getUTCHours();
+      const activeIdx = Math.min(5, Math.floor(currentHour / 4));
+      const bars = labels.map((label, idx) => ({
+        label,
+        income: 0,
+        expense: 0,
+        netSavings: 0,
+        active: idx === activeIdx,
+      }));
+      periodTransactions.forEach((tx) => {
+        const h = new Date(tx.transactionAt).getUTCHours();
+        const bIdx = Math.min(5, Math.floor(h / 4));
+        const amt = Number(tx.amount || 0);
+        if (tx.type === 'CREDIT' || tx.type === 'REFUND') bars[bIdx].income += amt;
+        else bars[bIdx].expense += amt;
+        bars[bIdx].netSavings = bars[bIdx].income - bars[bIdx].expense;
+      });
+      return bars;
+    } else if (selectedPeriod === 'W') {
+      const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const dayOfWeek = now.getUTCDay();
+      const currentDayIdx = (dayOfWeek + 6) % 7;
+      const bars = labels.map((label, idx) => ({
+        label,
+        income: 0,
+        expense: 0,
+        netSavings: 0,
+        active: idx === currentDayIdx,
+      }));
+      periodTransactions.forEach((tx) => {
+        const d = new Date(tx.transactionAt).getUTCDay();
+        const bIdx = (d + 6) % 7;
+        const amt = Number(tx.amount || 0);
+        if (tx.type === 'CREDIT' || tx.type === 'REFUND') bars[bIdx].income += amt;
+        else bars[bIdx].expense += amt;
+        bars[bIdx].netSavings = bars[bIdx].income - bars[bIdx].expense;
+      });
+      return bars;
+    } else if (selectedPeriod === 'Y') {
+      const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const currentMonthIdx = now.getUTCMonth();
+      const bars = labels.map((label, idx) => ({
+        label,
+        income: 0,
+        expense: 0,
+        netSavings: 0,
+        active: idx === currentMonthIdx,
+      }));
+      periodTransactions.forEach((tx) => {
+        const m = new Date(tx.transactionAt).getUTCMonth();
+        const amt = Number(tx.amount || 0);
+        if (tx.type === 'CREDIT' || tx.type === 'REFUND') bars[m].income += amt;
+        else bars[m].expense += amt;
+        bars[m].netSavings = bars[m].income - bars[m].expense;
+      });
+      return bars;
+    } else {
+      // Month
+      const labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+      const currentDay = now.getUTCDate();
+      const currentWeekIdx = Math.min(4, Math.floor((currentDay - 1) / 7));
+      const bars = labels.map((label, idx) => ({
+        label,
+        income: 0,
+        expense: 0,
+        netSavings: 0,
+        active: idx === currentWeekIdx,
+      }));
+      periodTransactions.forEach((tx) => {
+        const d = new Date(tx.transactionAt).getUTCDate();
+        const bIdx = Math.min(4, Math.floor((d - 1) / 7));
+        const amt = Number(tx.amount || 0);
+        if (tx.type === 'CREDIT' || tx.type === 'REFUND') bars[bIdx].income += amt;
+        else bars[bIdx].expense += amt;
+        bars[bIdx].netSavings = bars[bIdx].income - bars[bIdx].expense;
+      });
+      return bars;
+    }
+  }, [visualizationData, periodTransactions, selectedPeriod]);
+
+  // Global scale for the bar chart
+  const maxBarVal = useMemo(() => {
+    return Math.max(
+      ...chartBars.map((b) => Math.max(Number(b.income || 0), Number(b.expense || 0))),
+      1
+    );
+  }, [chartBars]);
+
+  // Scaled bar items
+  const scaledBars = useMemo(() => {
+    const isYear = chartBars.length > 7;
+    const barW = isYear ? 8 : 13;
+    const barGap = isYear ? 3 : 5;
+
+    return chartBars.map((item, idx) => {
+      const inc = Number(item.income || 0);
+      const exp = Number(item.expense || 0);
+      const isSelected = selectedBarIndex === idx;
+      const isHighlighted = selectedBarIndex !== null ? isSelected : !!item.active;
+
+      const incomeH = inc > 0 ? Math.max(8, Math.min(130, Math.round((inc / maxBarVal) * 130))) : 4;
+      const expenseH = exp > 0 ? Math.max(8, Math.min(130, Math.round((exp / maxBarVal) * 130))) : 4;
+
+      return {
+        ...item,
+        index: idx,
+        barW,
+        barGap,
+        incomeH,
+        expenseH,
+        isHighlighted,
+        isSelected,
+      };
+    });
+  }, [chartBars, maxBarVal, selectedBarIndex]);
+
+  // Active or selected bar for tooltip
+  const activeBar = useMemo(() => {
+    if (selectedBarIndex !== null && scaledBars[selectedBarIndex]) {
+      return scaledBars[selectedBarIndex];
+    }
+    return scaledBars.find((b) => b.active) || scaledBars[0];
+  }, [scaledBars, selectedBarIndex]);
+
+  // Donut chart spending categories from real backend expense analytics or transactions
   const categoryPalette = [
     theme.primary,
     theme.accentCyan,
@@ -80,16 +276,42 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
     theme.accentEmerald,
   ];
 
-  const spendingCategories = Array.isArray(expenseData?.categorySpending) && expenseData.categorySpending.length > 0
-    ? expenseData.categorySpending.slice(0, 5).map((cat, idx) => ({
+  const spendingCategories = useMemo(() => {
+    if (Array.isArray(expenseData?.categorySpending) && expenseData.categorySpending.length > 0) {
+      return expenseData.categorySpending.slice(0, 5).map((cat, idx) => ({
         name: cat.name,
         percentage: Math.round(Number(cat.percentage || 0)),
         amount: Number(cat.totalAmount || 0),
         color: categoryPalette[idx % categoryPalette.length],
-      }))
-    : (totalExpense > 0
+      }));
+    }
+
+    // Fallback compute from periodTransactions
+    const catMap = {};
+    let totalCatExpense = 0;
+    periodTransactions.forEach((tx) => {
+      if (tx.type === 'DEBIT' || tx.type === 'FEE') {
+        const cName = tx.category?.name || tx.category || 'General';
+        const amt = Number(tx.amount || 0);
+        catMap[cName] = (catMap[cName] || 0) + amt;
+        totalCatExpense += amt;
+      }
+    });
+
+    const entries = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (entries.length > 0) {
+      return entries.map(([name, amount], idx) => ({
+        name,
+        amount,
+        percentage: totalCatExpense > 0 ? Math.round((amount / totalCatExpense) * 100) : 0,
+        color: categoryPalette[idx % categoryPalette.length],
+      }));
+    }
+
+    return totalExpense > 0
       ? [{ name: 'Expenditure', percentage: 100, amount: totalExpense, color: theme.primary }]
-      : []);
+      : [];
+  }, [expenseData, periodTransactions, totalExpense, theme]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
@@ -98,12 +320,27 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
         <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Statistic</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || loading}
+            onRefresh={() => {
+              if (onRefresh) onRefresh();
+              fetchStats(selectedPeriod);
+            }}
+            tintColor={theme.primary}
+          />
+        }
+      >
         {/* Total Balance Card & Period Selector */}
         <View style={styles.balanceSection}>
           <Text style={[styles.balanceLabel, { color: theme.textMuted }]}>Total Balance</Text>
           <View style={styles.balanceRow}>
-            <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>{formatCurrency(totalBalance)}</Text>
+            <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>
+              {formatCurrency(totalBalance)}
+            </Text>
 
             {/* D / W / M / Y Selector */}
             <View style={[styles.periodToggle, { backgroundColor: theme.surfaceAlt }]}>
@@ -117,6 +354,7 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
                       styles.periodBtn,
                       isActive && { backgroundColor: theme.primary },
                     ]}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -133,7 +371,7 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
           </View>
         </View>
 
-        {/* Monthly Bar Chart */}
+        {/* Improved Interactive Bar Chart */}
         <View
           style={[
             styles.chartCard,
@@ -141,17 +379,67 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
             theme.cardShadowSoft,
           ]}
         >
+          {/* Chart Header: Title & Legend */}
+          <View style={styles.chartHeaderRow}>
+            <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>
+              {selectedPeriod === 'D' && 'Today Activity'}
+              {selectedPeriod === 'W' && 'This Week Activity'}
+              {selectedPeriod === 'M' && 'Monthly Breakdown'}
+              {selectedPeriod === 'Y' && 'Annual Overview'}
+            </Text>
+
+            {/* Legend */}
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.legendText, { color: theme.textMuted }]}>Income</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: theme.accentCyan }]} />
+                <Text style={[styles.legendText, { color: theme.textMuted }]}>Expense</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Interactive Active Column Tooltip Banner */}
+          {activeBar && (
+            <View style={[styles.tooltipBanner, { backgroundColor: theme.surfaceAlt }]}>
+              <Text style={[styles.tooltipLabel, { color: theme.primary }]}>
+                {activeBar.label}:
+              </Text>
+              <Text style={[styles.tooltipVal, { color: theme.textPrimary }]}>
+                Income {formatCurrency(activeBar.income)} • Expense {formatCurrency(activeBar.expense)}
+              </Text>
+            </View>
+          )}
+
+          {/* Bar Columns Container */}
           <View style={styles.chartBarsContainer}>
-            {barData.map((item, index) => (
-              <View key={index} style={styles.barColumn}>
-                <View style={styles.barsGroup}>
+            {scaledBars.map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                onPress={() => setSelectedBarIndex(item.index)}
+                style={[
+                  styles.barColumn,
+                  item.isSelected && [
+                    styles.selectedBarColumn,
+                    { borderColor: theme.primary, backgroundColor: 'rgba(67, 97, 238, 0.06)' },
+                  ],
+                ]}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.barsGroup, { gap: item.barGap }]}>
                   {/* Income Bar (Royal Blue) */}
                   <View
                     style={[
                       styles.bar,
                       {
+                        width: item.barW,
                         height: item.incomeH,
-                        backgroundColor: item.active ? theme.primary : 'rgba(67, 97, 238, 0.65)',
+                        backgroundColor: item.isHighlighted
+                          ? theme.primary
+                          : 'rgba(67, 97, 238, 0.45)',
+                        opacity: item.income > 0 ? 1 : 0.35,
                       },
                     ]}
                   />
@@ -160,8 +448,12 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
                     style={[
                       styles.bar,
                       {
+                        width: item.barW,
                         height: item.expenseH,
-                        backgroundColor: item.active ? theme.accentCyan : 'rgba(6, 214, 160, 0.65)',
+                        backgroundColor: item.isHighlighted
+                          ? theme.accentCyan
+                          : 'rgba(6, 214, 160, 0.45)',
+                        opacity: item.expense > 0 ? 1 : 0.35,
                       },
                     ]}
                   />
@@ -170,19 +462,21 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
                   style={[
                     styles.barLabel,
                     {
-                      color: item.active ? theme.primary : theme.textMuted,
-                      fontWeight: item.active ? '700' : '500',
+                      color: item.isHighlighted ? theme.primary : theme.textMuted,
+                      fontWeight: item.isHighlighted ? '800' : '500',
+                      fontSize: scaledBars.length > 7 ? 10 : 12,
                     },
                   ]}
+                  numberOfLines={1}
                 >
                   {item.label}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Income & Expense Chips Row (Matching Image 1) */}
+        {/* Income & Expense Chips Row */}
         <View style={styles.metricsRow}>
           {/* Income Chip */}
           <View
@@ -195,9 +489,11 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
             <View style={[styles.metricIconBox, { backgroundColor: 'rgba(67, 97, 238, 0.12)' }]}>
               <ArrowDownLeft size={18} color={theme.primary} strokeWidth={2.6} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.metricLabel, { color: theme.textMuted }]}>Income</Text>
-              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>{formatCurrency(totalIncome)}</Text>
+              <Text style={[styles.metricVal, { color: theme.textPrimary }]} numberOfLines={1}>
+                {formatCurrency(totalIncome)}
+              </Text>
             </View>
           </View>
 
@@ -212,35 +508,14 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
             <View style={[styles.metricIconBox, { backgroundColor: 'rgba(6, 214, 160, 0.12)' }]}>
               <ArrowUpRight size={18} color={theme.accentCyan} strokeWidth={2.6} />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.metricLabel, { color: theme.textMuted }]}>Expense</Text>
-              <Text style={[styles.metricVal, { color: theme.textPrimary }]}>{formatCurrency(totalExpense)}</Text>
+              <Text style={[styles.metricVal, { color: theme.textPrimary }]} numberOfLines={1}>
+                {formatCurrency(totalExpense)}
+              </Text>
             </View>
           </View>
         </View>
-
-        {/* Make Finance More Efficient Promotion Banner */}
-        <TouchableOpacity
-          style={[
-            styles.efficiencyCard,
-            { backgroundColor: theme.primary },
-            theme.cardShadow,
-          ]}
-          activeOpacity={0.9}
-        >
-          <View style={styles.efficiencyText}>
-            <Text style={styles.effTitle}>Make Finance More Efficient</Text>
-            <Text style={styles.effSub}>Automated categorization & budget recommendations</Text>
-            <View style={styles.effBtn}>
-              <Text style={styles.effBtnText}>See All</Text>
-              <ChevronRight size={14} color="#FFFFFF" />
-            </View>
-          </View>
-          {/* Mini Donut illustration preview */}
-          <View style={styles.effGraphic}>
-            <TrendingUp size={36} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
 
         {/* Total Spending Section with Donut Breakdown */}
         <View style={styles.spendingSection}>
@@ -307,14 +582,18 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
             <View style={styles.categoriesList}>
               {spendingCategories.length === 0 ? (
                 <View style={{ paddingVertical: 12 }}>
-                  <Text style={{ color: theme.textMuted, fontSize: 13 }}>No expense categories recorded yet.</Text>
+                  <Text style={{ color: theme.textMuted, fontSize: 13 }}>
+                    No expense categories recorded yet.
+                  </Text>
                 </View>
               ) : (
                 spendingCategories.map((c) => (
                   <View key={c.name} style={styles.categoryItem}>
                     <View style={[styles.catColorDot, { backgroundColor: c.color }]} />
                     <View style={styles.catInfo}>
-                      <Text style={[styles.catName, { color: theme.textPrimary }]}>{c.name}</Text>
+                      <Text style={[styles.catName, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {c.name}
+                      </Text>
                       <Text style={[styles.catAmt, { color: theme.textMuted }]}>
                         {c.percentage}% • {formatCurrency(c.amount)}
                       </Text>
@@ -324,6 +603,92 @@ export default function StatisticScreen({ theme, onNavigate, overview, balance =
               )}
             </View>
           </View>
+        </View>
+
+        {/* Real Transactions Breakdown for Selected Period */}
+        <View style={styles.activitySection}>
+          <View style={styles.activityHeaderRow}>
+            <Text style={[styles.spendingTitle, { color: theme.textPrimary }]}>
+              Activity in this Period ({periodTransactions.length})
+            </Text>
+          </View>
+
+          {periodTransactions.length === 0 ? (
+            <View
+              style={[
+                styles.emptyCard,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
+              <Receipt size={32} color={theme.textMuted} />
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                No transactions recorded for this period.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.txList}>
+              {periodTransactions.slice(0, 10).map((tx) => {
+                const isCredit = tx.type === 'CREDIT' || tx.type === 'REFUND';
+                const formattedDate = tx.transactionAt
+                  ? new Date(tx.transactionAt).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                    })
+                  : 'Recent';
+
+                return (
+                  <View
+                    key={tx.id}
+                    style={[
+                      styles.txRow,
+                      {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                      },
+                      theme.cardShadowSoft,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.txIconBox,
+                        {
+                          backgroundColor: isCredit
+                            ? 'rgba(6, 214, 160, 0.12)'
+                            : 'rgba(67, 97, 238, 0.12)',
+                        },
+                      ]}
+                    >
+                      {isCredit ? (
+                        <ArrowDownLeft size={18} color={theme.accentEmerald} strokeWidth={2.4} />
+                      ) : (
+                        <ArrowUpRight size={18} color={theme.primary} strokeWidth={2.4} />
+                      )}
+                    </View>
+
+                    <View style={styles.txInfo}>
+                      <Text style={[styles.txTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {tx.merchantName || tx.description || 'Transaction'}
+                      </Text>
+                      <Text style={[styles.txCategory, { color: theme.textMuted }]}>
+                        {tx.category?.name || tx.category || 'General'} • {formattedDate}
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.txAmount,
+                        {
+                          color: isCredit ? theme.accentEmerald : theme.textPrimary,
+                        },
+                      ]}
+                    >
+                      {isCredit ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -346,7 +711,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 36,
+    paddingBottom: 40,
   },
   balanceSection: {
     marginTop: 10,
@@ -387,32 +752,82 @@ const styles = StyleSheet.create({
   },
   chartCard: {
     borderRadius: 22,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
     marginBottom: 16,
+  },
+  chartHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  legendRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  tooltipBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginBottom: 12,
+    gap: 6,
+  },
+  tooltipLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  tooltipVal: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   chartBarsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    height: 160,
-    paddingTop: 10,
+    height: 155,
+    paddingTop: 8,
   },
   barColumn: {
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    paddingHorizontal: 3,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  selectedBarColumn: {
+    borderWidth: 1,
   },
   barsGroup: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 6,
   },
   bar: {
-    width: 14,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   barLabel: {
-    fontSize: 12,
+    fontSize: 11,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -444,60 +859,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  efficiencyCard: {
-    borderRadius: 20,
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  efficiencyText: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  effTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  effSub: {
-    color: 'rgba(255, 255, 255, 0.82)',
-    fontSize: 11,
-    lineHeight: 16,
-    marginBottom: 10,
-  },
-  effBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  effBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  effGraphic: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   spendingSection: {
     marginTop: 4,
+    marginBottom: 18,
   },
   spendingTitle: {
     fontSize: 17,
     fontWeight: '800',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   donutCard: {
     borderRadius: 22,
@@ -547,5 +916,59 @@ const styles = StyleSheet.create({
   },
   catAmt: {
     fontSize: 11,
+  },
+  activitySection: {
+    marginTop: 4,
+  },
+  activityHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  emptyCard: {
+    borderRadius: 18,
+    padding: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  emptyText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  txList: {
+    gap: 10,
+  },
+  txRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  txIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  txInfo: {
+    flex: 1,
+  },
+  txTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  txCategory: {
+    fontSize: 12,
+  },
+  txAmount: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginLeft: 12,
   },
 });

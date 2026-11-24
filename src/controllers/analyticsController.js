@@ -71,8 +71,9 @@ const getComparisons = async (req, res, next) => {
  */
 const getVisualizations = async (req, res, next) => {
   try {
-    const { months } = req.query;
+    const { timeframe, months } = req.query;
     const visualizations = await getVisualizationData(req.user.id, {
+      timeframe,
       months: months ? parseInt(months, 10) : 6,
     });
     return successResponse(res, {

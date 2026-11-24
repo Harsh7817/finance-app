@@ -15,34 +15,40 @@ const prisma = require('../config/prisma');
 const getDateRange = (timeframe, customStartDate, customEndDate) => {
   const now = new Date();
   let start;
-  let end = customEndDate ? new Date(customEndDate) : new Date(now);
+  let end;
 
   if (customStartDate) {
     start = new Date(customStartDate);
+    end = customEndDate ? new Date(customEndDate) : new Date(now);
   } else {
-    start = new Date(now);
     switch (timeframe) {
       case 'today':
-        start.setUTCHours(0, 0, 0, 0);
+        start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+        end = customEndDate
+          ? new Date(customEndDate)
+          : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
         break;
       case 'week': {
-        const day = start.getUTCDay();
-        const diff = start.getUTCDate() - day + (day === 0 ? -6 : 1); // Monday
-        start.setUTCDate(diff);
-        start.setUTCHours(0, 0, 0, 0);
+        const day = now.getUTCDay();
+        const diff = now.getUTCDate() - day + (day === 0 ? -6 : 1); // Monday
+        start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff, 0, 0, 0, 0));
+        end = customEndDate
+          ? new Date(customEndDate)
+          : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff + 6, 23, 59, 59, 999));
         break;
       }
       case 'year':
-        start.setUTCMonth(0, 1);
-        start.setUTCHours(0, 0, 0, 0);
+        start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+        end = customEndDate
+          ? new Date(customEndDate)
+          : new Date(Date.UTC(now.getUTCFullYear(), 11, 31, 23, 59, 59, 999));
         break;
       case 'month':
       default: {
-        start.setUTCDate(1);
-        start.setUTCHours(0, 0, 0, 0);
-        if (!customEndDate) {
-          end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-        }
+        start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+        end = customEndDate
+          ? new Date(customEndDate)
+          : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
         break;
       }
     }
@@ -447,7 +453,7 @@ const getHistoricalComparisons = async (userId) => {
  *  - Savings progress charts (goals progress & historical savings rate)
  */
 const getVisualizationData = async (userId, options = {}) => {
-  const { months = 6 } = options;
+  const { timeframe = 'month', months = 6 } = options;
   const now = new Date();
 
   // 1. Fetch last N months of data for Monthly Spending Trends & Income vs Expense
@@ -525,6 +531,163 @@ const getVisualizationData = async (userId, options = {}) => {
     savingsRatePercentage: b.income > 0 ? Number(((b.netSavings / b.income) * 100).toFixed(2)) : 0,
   }));
 
+  // 2. Generate timeframe-specific Chart Bars for Day, Week, Month, and Year
+  let chartBars = [];
+
+  if (timeframe === 'today') {
+    const hourLabels = ['12am', '4am', '8am', '12pm', '4pm', '8pm'];
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const endOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const currentHour = now.getUTCHours();
+    const activeIdx = Math.min(5, Math.floor(currentHour / 4));
+
+    const dayTxs = await prisma.transaction.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: ['POSTED', 'RECONCILED'] },
+        type: { in: ['CREDIT', 'DEBIT', 'FEE', 'REFUND'] },
+        transactionAt: { gte: startOfDay, lte: endOfDay },
+      },
+    });
+
+    chartBars = hourLabels.map((label, idx) => ({
+      label,
+      income: 0,
+      expense: 0,
+      netSavings: 0,
+      active: idx === activeIdx,
+    }));
+
+    for (const tx of dayTxs) {
+      const h = tx.transactionAt.getUTCHours();
+      const bIdx = Math.min(5, Math.floor(h / 4));
+      const amt = Number(tx.amount);
+      if (tx.type === 'CREDIT' || tx.type === 'REFUND') {
+        chartBars[bIdx].income += amt;
+      } else {
+        chartBars[bIdx].expense += amt;
+      }
+      chartBars[bIdx].netSavings = chartBars[bIdx].income - chartBars[bIdx].expense;
+    }
+  } else if (timeframe === 'week') {
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dayOfWeek = now.getUTCDay();
+    const mondayDiff = now.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const startOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), mondayDiff, 0, 0, 0, 0));
+    const endOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), mondayDiff + 6, 23, 59, 59, 999));
+    const currentDayIdx = (dayOfWeek + 6) % 7;
+
+    const weekTxs = await prisma.transaction.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: ['POSTED', 'RECONCILED'] },
+        type: { in: ['CREDIT', 'DEBIT', 'FEE', 'REFUND'] },
+        transactionAt: { gte: startOfWeek, lte: endOfWeek },
+      },
+    });
+
+    chartBars = dayNames.map((label, idx) => ({
+      label,
+      income: 0,
+      expense: 0,
+      netSavings: 0,
+      active: idx === currentDayIdx,
+    }));
+
+    for (const tx of weekTxs) {
+      const txDay = tx.transactionAt.getUTCDay();
+      const bIdx = (txDay + 6) % 7;
+      const amt = Number(tx.amount);
+      if (tx.type === 'CREDIT' || tx.type === 'REFUND') {
+        chartBars[bIdx].income += amt;
+      } else {
+        chartBars[bIdx].expense += amt;
+      }
+      chartBars[bIdx].netSavings = chartBars[bIdx].income - chartBars[bIdx].expense;
+    }
+  } else if (timeframe === 'year') {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0));
+    const endOfYear = new Date(Date.UTC(now.getUTCFullYear(), 11, 31, 23, 59, 59, 999));
+    const currentMonthIdx = now.getUTCMonth();
+
+    const yearTxs = await prisma.transaction.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: ['POSTED', 'RECONCILED'] },
+        type: { in: ['CREDIT', 'DEBIT', 'FEE', 'REFUND'] },
+        transactionAt: { gte: startOfYear, lte: endOfYear },
+      },
+    });
+
+    chartBars = monthNames.map((label, idx) => ({
+      label,
+      income: 0,
+      expense: 0,
+      netSavings: 0,
+      active: idx === currentMonthIdx,
+    }));
+
+    for (const tx of yearTxs) {
+      const mIdx = tx.transactionAt.getUTCMonth();
+      const amt = Number(tx.amount);
+      if (tx.type === 'CREDIT' || tx.type === 'REFUND') {
+        chartBars[mIdx].income += amt;
+      } else {
+        chartBars[mIdx].expense += amt;
+      }
+      chartBars[mIdx].netSavings = chartBars[mIdx].income - chartBars[mIdx].expense;
+    }
+  } else {
+    // Default: 'month' - broken down into weeks W1, W2, W3, W4, W5
+    const weekLabels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+    const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    const currentDayOfMonth = now.getUTCDate();
+    const currentWeekIdx = Math.min(4, Math.floor((currentDayOfMonth - 1) / 7));
+
+    const monthTxs = await prisma.transaction.findMany({
+      where: {
+        userId,
+        deletedAt: null,
+        status: { in: ['POSTED', 'RECONCILED'] },
+        type: { in: ['CREDIT', 'DEBIT', 'FEE', 'REFUND'] },
+        transactionAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+    });
+
+    chartBars = weekLabels.map((label, idx) => ({
+      label,
+      income: 0,
+      expense: 0,
+      netSavings: 0,
+      active: idx === currentWeekIdx,
+    }));
+
+    for (const tx of monthTxs) {
+      const day = tx.transactionAt.getUTCDate();
+      const bIdx = Math.min(4, Math.floor((day - 1) / 7));
+      const amt = Number(tx.amount);
+      if (tx.type === 'CREDIT' || tx.type === 'REFUND') {
+        chartBars[bIdx].income += amt;
+      } else {
+        chartBars[bIdx].expense += amt;
+      }
+      chartBars[bIdx].netSavings = chartBars[bIdx].income - chartBars[bIdx].expense;
+    }
+  }
+
+  // Format numbers to 2 decimals
+  chartBars = chartBars.map((b) => ({
+    ...b,
+    income: Number(b.income.toFixed(2)),
+    expense: Number(b.expense.toFixed(2)),
+    netSavings: Number(b.netSavings.toFixed(2)),
+  }));
+
   // Category distribution chart
   const categoryDistributionChart = Array.from(currentMonthCategoryMap.values()).map((c) => ({
     label: c.name,
@@ -569,6 +732,8 @@ const getVisualizationData = async (userId, options = {}) => {
   });
 
   return {
+    timeframe,
+    chartBars,
     incomeVsExpenseChart,
     categoryDistributionChart,
     monthlyTrendsChart,

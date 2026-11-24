@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import {
   Home,
   BarChart2,
-  Wallet,
   User,
 } from 'lucide-react-native';
 
@@ -50,20 +49,6 @@ export default function WalleyBottomNav({
             strokeWidth={activeTab === 'statistic' ? 2.5 : 2}
           />
           {activeTab === 'statistic' && <View style={[styles.activeDot, { backgroundColor: theme.primary }]} />}
-        </TouchableOpacity>
-
-        {/* Tab 3: Wallet */}
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onSelectTab('wallet')}
-          activeOpacity={0.7}
-        >
-          <Wallet
-            size={22}
-            color={activeTab === 'wallet' ? theme.primary : theme.textDim}
-            strokeWidth={activeTab === 'wallet' ? 2.5 : 2}
-          />
-          {activeTab === 'wallet' && <View style={[styles.activeDot, { backgroundColor: theme.primary }]} />}
         </TouchableOpacity>
 
         {/* Tab 4: Profile */}

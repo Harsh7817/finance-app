@@ -146,12 +146,16 @@ export const api = {
 
   // CSV Statement Ingestion
   uploadCsv: (formData) => apiRequest('/imports/csv', { method: 'POST', body: formData }),
+  uploadCsvContent: (data) => apiRequest('/imports/csv', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 
   // Analytics
   getOverview: (timeframe = 'month') => apiRequest(`/analytics/overview?timeframe=${timeframe}`),
   getExpenses: (timeframe = 'month') => apiRequest(`/analytics/expenses?timeframe=${timeframe}`),
   getComparisons: () => apiRequest('/analytics/comparisons'),
-  getVisualizations: (months = 6) => apiRequest(`/analytics/visualizations?months=${months}`),
+  getVisualizations: (timeframe = 'month', months = 6) => apiRequest(`/analytics/visualizations?timeframe=${timeframe}&months=${months}`),
 
   // Budgets
   getBudgets: () => apiRequest('/budgets'),
