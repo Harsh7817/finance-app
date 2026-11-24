@@ -46,6 +46,7 @@ import RequestScreen from './src/screens/RequestScreen';
 import BillPayScreen from './src/screens/BillPayScreen';
 import PayToScreen from './src/screens/PayToScreen';
 import SelectCardScreen from './src/screens/SelectCardScreen';
+import ImportPreviewScreen from './src/screens/ImportPreviewScreen';
 
 export default function App() {
   const [token, setToken] = useState(null);
@@ -119,7 +120,7 @@ export default function App() {
       const [ov, accs, txs] = await Promise.all([
         api.getOverview().catch(() => null),
         api.getAccounts().catch(() => []),
-        api.getTransactions('?limit=50').catch(() => []),
+        api.getTransactions('?limit=500').catch(() => []),
       ]);
 
       if (ov) setOverview(ov);
@@ -326,14 +327,23 @@ export default function App() {
       await fetchDashboardData();
 
       const parsedCount = importResult?.parsedRecords || importResult?.totalRecords || 'all';
+      // Show success alert and allow navigating to Review or Dashboard
       Alert.alert(
         'Import Complete',
         `Successfully processed ${parsedCount} transactions from "${fileName}" into your account.`,
         [
           {
+            text: 'Review Categories',
+            onPress: () => {
+              setCurrentScreen('importPreview');
+            },
+          },
+          {
             text: 'View Dashboard',
             onPress: () => {
-              if (onSuccess) onSuccess();
+              // Navigate internally using internal state
+              setCurrentScreen('home');
+              setActiveTab('home');
             },
           },
         ]
@@ -634,6 +644,17 @@ export default function App() {
             onBack={() => navigateTo('wallet')}
             onCardSaved={() => {
               navigateTo('wallet');
+            }}
+          />
+        )}
+
+        {currentScreen === 'importPreview' && (
+          <ImportPreviewScreen
+            theme={theme}
+            onNavigate={navigateTo}
+            onFinish={() => {
+              fetchDashboardData();
+              navigateTo(returnScreen || 'home');
             }}
           />
         )}

@@ -18,6 +18,9 @@ import {
   CreditCard,
   Coffee,
   Zap,
+  HelpCircle,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react-native';
 import { formatCurrency } from '../theme';
 import { api } from '../api';
@@ -38,6 +41,7 @@ export default function StatisticScreen({
   const [analyticsData, setAnalyticsData] = useState(null);
   const [expenseData, setExpenseData] = useState(null);
   const [visualizationData, setVisualizationData] = useState(null);
+  const [catSummary, setCatSummary] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const fetchStats = async (period) => {
@@ -48,15 +52,17 @@ export default function StatisticScreen({
 
     setLoading(true);
     try {
-      const [ov, exp, viz] = await Promise.all([
+      const [ov, exp, viz, summary] = await Promise.all([
         api.getOverview(timeframe).catch(() => null),
         api.getExpenses(timeframe).catch(() => null),
         api.getVisualizations(timeframe).catch(() => null),
+        api.getCategorizationSummary().catch(() => null),
       ]);
 
       if (ov) setAnalyticsData(ov);
       if (exp) setExpenseData(exp);
       if (viz) setVisualizationData(viz);
+      if (summary) setCatSummary(summary);
       setSelectedBarIndex(null);
     } catch {
       // Offline safe fallback
@@ -95,7 +101,10 @@ export default function StatisticScreen({
       const endOfWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff + 6, 23, 59, 59, 999));
       return txDate >= startOfWeek && txDate <= endOfWeek;
     } else if (period === 'Y') {
-      return txDate.getUTCFullYear() === now.getUTCFullYear();
+      // Last 1 full year (or matching current calendar year)
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(now.getFullYear() - 1);
+      return txDate >= oneYearAgo || txDate.getFullYear() === now.getFullYear();
     } else {
       // Month
       return (
@@ -371,6 +380,37 @@ export default function StatisticScreen({
           </View>
         </View>
 
+        {/* Uncategorized Review Card (Tap to Review & Categorize) */}
+        {catSummary && (catSummary.needsReview > 0 || catSummary.uncategorized > 0) && (
+          <TouchableOpacity
+            onPress={() => onNavigate && onNavigate('importPreview')}
+            style={[
+              styles.reviewPromptCard,
+              { backgroundColor: theme.surface, borderColor: 'rgba(245, 158, 11, 0.4)' },
+              theme.cardShadowSoft,
+            ]}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.reviewIconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+              <HelpCircle size={20} color="#F59E0B" strokeWidth={2.4} />
+            </View>
+            <View style={styles.reviewTextBox}>
+              <View style={styles.reviewHeaderLine}>
+                <Text style={[styles.reviewTitle, { color: theme.textPrimary }]}>
+                  {catSummary.needsReview} Transactions Need Review
+                </Text>
+                <View style={styles.reviewPill}>
+                  <Text style={styles.reviewPillText}>Action Needed</Text>
+                </View>
+              </View>
+              <Text style={[styles.reviewSub, { color: theme.textMuted }]}>
+                Categorize payments to improve spending reports and budget tracking.
+              </Text>
+            </View>
+            <ChevronRight size={18} color={theme.textMuted} />
+          </TouchableOpacity>
+        )}
+
         {/* Improved Interactive Bar Chart */}
         <View
           style={[
@@ -627,7 +667,7 @@ export default function StatisticScreen({
             </View>
           ) : (
             <View style={styles.txList}>
-              {periodTransactions.slice(0, 10).map((tx) => {
+              {periodTransactions.map((tx) => {
                 const isCredit = tx.type === 'CREDIT' || tx.type === 'REFUND';
                 const formattedDate = tx.transactionAt
                   ? new Date(tx.transactionAt).toLocaleDateString('en-IN', {
@@ -749,6 +789,51 @@ const styles = StyleSheet.create({
   periodText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  reviewPromptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 12,
+  },
+  reviewIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reviewTextBox: {
+    flex: 1,
+  },
+  reviewHeaderLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  reviewTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  reviewPill: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  reviewPillText: {
+    color: '#D97706',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  reviewSub: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   chartCard: {
     borderRadius: 22,

@@ -13,6 +13,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const recurringRoutes = require('./routes/recurringRoutes');
+const categorizationRoutes = require('./routes/categorizationRoutes');
 const { successResponse, errorResponse } = require('./utils/response');
 const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
 
@@ -71,6 +72,7 @@ app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/budgets', budgetRoutes);
 app.use('/api/v1/goals', goalRoutes);
 app.use('/api/v1/recurring', recurringRoutes);
+app.use('/api/v1/categorization', categorizationRoutes);
 
 // 404 Handler
 app.use(notFoundHandler);

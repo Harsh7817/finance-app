@@ -151,6 +151,24 @@ export const api = {
     body: JSON.stringify(data),
   }),
 
+  // Categorization & Review System
+  getCategorizationSummary: () => apiRequest('/categorization/summary'),
+  getUncategorizedTransactions: (params = '') => apiRequest(`/categorization/transactions/uncategorized${params}`),
+  updateTransactionCategory: (id, data) => apiRequest(`/categorization/transactions/${id}/category`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  bulkCategorize: (data) => apiRequest('/categorization/bulk-categorize', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getUserMappings: () => apiRequest('/categorization/mappings'),
+  createUserMapping: (data) => apiRequest('/categorization/mappings', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteUserMapping: (id) => apiRequest(`/categorization/mappings/${id}`, { method: 'DELETE' }),
+
   // Analytics
   getOverview: (timeframe = 'month') => apiRequest(`/analytics/overview?timeframe=${timeframe}`),
   getExpenses: (timeframe = 'month') => apiRequest(`/analytics/expenses?timeframe=${timeframe}`),

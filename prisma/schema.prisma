@@ -151,6 +151,25 @@ enum CategorizationMethod {
   @@map("categorization_method")
 }
 
+enum CategorizationSource {
+  USER_MAPPING
+  GLOBAL_MERCHANT
+  RULE_BASED
+  ML_PREDICTION
+  MANUAL
+  UNCATEGORIZED
+
+  @@map("categorization_source")
+}
+
+enum CategorizationStatus {
+  AUTO_CATEGORIZED
+  NEEDS_REVIEW
+  MANUALLY_CATEGORIZED
+
+  @@map("categorization_status")
+}
+
 enum BudgetPeriodType {
   MONTHLY
   WEEKLY
@@ -271,6 +290,7 @@ model User {
   advisoryRequests     AdvisoryRequest[]
   feedbacks            Feedback[]
   notifications        Notification[]
+  userMerchantMappings UserMerchantMapping[]
 
   @@map("users")
 }
@@ -458,6 +478,8 @@ model Category {
   recurringCommitments RecurringCommitment[]
   predictions          Prediction[]
   advisoryRequests     AdvisoryRequest[]
+  userMerchantMappings UserMerchantMapping[] @relation("UserMerchantMappingCategory")
+  merchantDefaults     Merchant[]            @relation("MerchantDefaultCategory")
 
   @@index([parentId], name: "idx_categories_parent")
   @@map("categories")
@@ -491,19 +513,27 @@ model Transaction {
   updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt             DateTime?         @map("deleted_at") @db.Timestamptz(6)
 
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account              FinancialAccount      @relation(fields: [userId, accountId], references: [userId, id], onDelete: Restrict)
-  batch                ImportBatch?          @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  rawMessage           RawMessage?           @relation(fields: [rawMessageId], references: [id], onDelete: SetNull)
-  category             Category              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  originalTransaction  Transaction?          @relation("RefundReversal", fields: [originalTransactionId], references: [id], onDelete: SetNull)
-  refundedReversals    Transaction[]         @relation("RefundReversal")
-  possibleDuplicateOf  Transaction?          @relation("PossibleDuplicates", fields: [possibleDuplicateOfId], references: [id], onDelete: SetNull)
-  duplicateCandidates  Transaction[]         @relation("PossibleDuplicates")
-  transferSource       Transfer?             @relation("TransferSourceTxn")
-  transferDestination  Transfer?             @relation("TransferDestTxn")
-  goalContributions    GoalContribution[]
-  categorizationLogs   CategorizationLog[]
+  // Smart Categorization fields (nullable for backward compatibility)
+  extractedMerchantName  String?               @map("extracted_merchant_name") @db.VarChar(150)
+  counterpartyIdentifier String?               @map("counterparty_identifier") @db.VarChar(255)
+  categorizationSource   CategorizationSource? @map("categorization_source")
+  categorizationStatus   CategorizationStatus? @map("categorization_status")
+  confidenceScore        Decimal?              @map("confidence_score") @db.Decimal(5, 4)
+  categorizedAt          DateTime?             @map("categorized_at") @db.Timestamptz(6)
+
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account             FinancialAccount    @relation(fields: [userId, accountId], references: [userId, id], onDelete: Restrict)
+  batch               ImportBatch?        @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  rawMessage          RawMessage?         @relation(fields: [rawMessageId], references: [id], onDelete: SetNull)
+  category            Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  originalTransaction Transaction?        @relation("RefundReversal", fields: [originalTransactionId], references: [id], onDelete: SetNull)
+  refundedReversals   Transaction[]       @relation("RefundReversal")
+  possibleDuplicateOf Transaction?        @relation("PossibleDuplicates", fields: [possibleDuplicateOfId], references: [id], onDelete: SetNull)
+  duplicateCandidates Transaction[]       @relation("PossibleDuplicates")
+  transferSource      Transfer?           @relation("TransferSourceTxn")
+  transferDestination Transfer?           @relation("TransferDestTxn")
+  goalContributions   GoalContribution[]
+  categorizationLogs  CategorizationLog[]
 
   @@index([userId, transactionAt], name: "idx_transactions_user_date")
   @@index([userId, categoryId, transactionAt], name: "idx_transactions_user_cat_date")
@@ -514,25 +544,25 @@ model Transaction {
 }
 
 model Transfer {
-  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @map("transfer_id") @db.Uuid
-  userId                 String         @map("user_id") @db.Uuid
-  sourceAccountId        String         @map("source_account_id") @db.Uuid
-  destinationAccountId   String         @map("destination_account_id") @db.Uuid
-  sourceTransactionId    String         @unique @map("source_transaction_id") @db.Uuid
-  destinationTransactionId String       @unique @map("destination_transaction_id") @db.Uuid
-  amount                 Decimal        @map("amount") @db.Decimal(14, 2)
-  currency               String         @default("INR") @map("currency") @db.VarChar(3)
-  status                 TransferStatus @default(SETTLED) @map("status")
-  transferDate           DateTime       @map("transfer_date") @db.Timestamptz(6)
-  notes                  String?        @map("notes") @db.Text
-  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @map("transfer_id") @db.Uuid
+  userId                   String         @map("user_id") @db.Uuid
+  sourceAccountId          String         @map("source_account_id") @db.Uuid
+  destinationAccountId     String         @map("destination_account_id") @db.Uuid
+  sourceTransactionId      String         @unique @map("source_transaction_id") @db.Uuid
+  destinationTransactionId String         @unique @map("destination_transaction_id") @db.Uuid
+  amount                   Decimal        @map("amount") @db.Decimal(14, 2)
+  currency                 String         @default("INR") @map("currency") @db.VarChar(3)
+  status                   TransferStatus @default(SETTLED) @map("status")
+  transferDate             DateTime       @map("transfer_date") @db.Timestamptz(6)
+  notes                    String?        @map("notes") @db.Text
+  createdAt                DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sourceAccount      FinancialAccount @relation("TransferSourceAccount", fields: [userId, sourceAccountId], references: [userId, id], onDelete: Restrict)
-  destinationAccount FinancialAccount @relation("TransferDestinationAccount", fields: [userId, destinationAccountId], references: [userId, id], onDelete: Restrict)
-  sourceTransaction  Transaction      @relation("TransferSourceTxn", fields: [sourceTransactionId], references: [id], onDelete: Cascade)
-  destinationTransaction Transaction  @relation("TransferDestTxn", fields: [destinationTransactionId], references: [id], onDelete: Cascade)
+  user                   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceAccount          FinancialAccount @relation("TransferSourceAccount", fields: [userId, sourceAccountId], references: [userId, id], onDelete: Restrict)
+  destinationAccount     FinancialAccount @relation("TransferDestinationAccount", fields: [userId, destinationAccountId], references: [userId, id], onDelete: Restrict)
+  sourceTransaction      Transaction      @relation("TransferSourceTxn", fields: [sourceTransactionId], references: [id], onDelete: Cascade)
+  destinationTransaction Transaction      @relation("TransferDestTxn", fields: [destinationTransactionId], references: [id], onDelete: Cascade)
 
   @@index([userId, transferDate], name: "idx_transfers_user_date")
   @@map("transfers")
@@ -579,19 +609,19 @@ model Budget {
 }
 
 model FinancialGoal {
-  id                        String             @id @default(dbgenerated("gen_random_uuid()")) @map("goal_id") @db.Uuid
-  userId                    String             @map("user_id") @db.Uuid
-  accountId                 String?            @map("account_id") @db.Uuid
-  name                      String             @map("name") @db.VarChar(100)
-  targetAmount              Decimal            @map("target_amount") @db.Decimal(14, 2)
-  cachedCurrentAmount       Decimal            @default(0.00) @map("cached_current_amount") @db.Decimal(14, 2)
-  targetDate                DateTime           @map("target_date") @db.Date
-  monthlyTargetContribution Decimal            @default(0.00) @map("monthly_target_contribution") @db.Decimal(14, 2)
-  priority                  Int                @default(1) @map("priority")
-  status                    GoalStatus         @default(IN_PROGRESS) @map("status")
-  notes                     String?            @map("notes") @db.Text
-  createdAt                 DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                 DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                        String     @id @default(dbgenerated("gen_random_uuid()")) @map("goal_id") @db.Uuid
+  userId                    String     @map("user_id") @db.Uuid
+  accountId                 String?    @map("account_id") @db.Uuid
+  name                      String     @map("name") @db.VarChar(100)
+  targetAmount              Decimal    @map("target_amount") @db.Decimal(14, 2)
+  cachedCurrentAmount       Decimal    @default(0.00) @map("cached_current_amount") @db.Decimal(14, 2)
+  targetDate                DateTime   @map("target_date") @db.Date
+  monthlyTargetContribution Decimal    @default(0.00) @map("monthly_target_contribution") @db.Decimal(14, 2)
+  priority                  Int        @default(1) @map("priority")
+  status                    GoalStatus @default(IN_PROGRESS) @map("status")
+  notes                     String?    @map("notes") @db.Text
+  createdAt                 DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   account       FinancialAccount?  @relation(fields: [userId, accountId], references: [userId, id], onDelete: SetNull)
@@ -689,17 +719,17 @@ model AdvisoryRequest {
 }
 
 model AdvisoryDecision {
-  requestId             String          @id @map("request_id") @db.Uuid
-  decisionOutcome       AdvisoryOutcome @map("decision_outcome")
-  affordabilityScore    Decimal         @map("affordability_score") @db.Decimal(5, 2)
-  deterministicFactors  Json            @map("deterministic_factors")
-  budgetImpactSummary   Json            @map("budget_impact_summary")
-  goalImpactSummary     Json            @map("goal_impact_summary")
-  llmExplanation        String          @map("llm_explanation") @db.Text
-  disclaimer            String          @map("disclaimer") @db.Text
-  ruleEngineVersion     String          @map("rule_engine_version") @db.VarChar(50)
-  llmModelVersion       String          @map("llm_model_version") @db.VarChar(50)
-  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  requestId            String          @id @map("request_id") @db.Uuid
+  decisionOutcome      AdvisoryOutcome @map("decision_outcome")
+  affordabilityScore   Decimal         @map("affordability_score") @db.Decimal(5, 2)
+  deterministicFactors Json            @map("deterministic_factors")
+  budgetImpactSummary  Json            @map("budget_impact_summary")
+  goalImpactSummary    Json            @map("goal_impact_summary")
+  llmExplanation       String          @map("llm_explanation") @db.Text
+  disclaimer           String          @map("disclaimer") @db.Text
+  ruleEngineVersion    String          @map("rule_engine_version") @db.VarChar(50)
+  llmModelVersion      String          @map("llm_model_version") @db.VarChar(50)
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
   request AdvisoryRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
@@ -757,4 +787,63 @@ model AuditEvent {
   @@index([entityType, entityId], name: "idx_audit_events_entity")
   @@index([action, createdAt], name: "idx_audit_events_action_date")
   @@map("audit_events")
+}
+
+// ============================================================================
+// SMART CATEGORIZATION — Global Merchant Database
+// ============================================================================
+
+model Merchant {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @map("merchant_id") @db.Uuid
+  merchantName      String   @map("merchant_name") @db.VarChar(150)
+  normalizedName    String   @unique @map("normalized_name") @db.VarChar(150)
+  defaultCategoryId String?  @map("default_category_id") @db.Uuid
+  isVerified        Boolean  @default(true) @map("is_verified")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  defaultCategory Category?             @relation("MerchantDefaultCategory", fields: [defaultCategoryId], references: [id], onDelete: SetNull)
+  aliases         MerchantAlias[]
+  userMappings    UserMerchantMapping[]
+
+  @@index([normalizedName], name: "idx_merchants_normalized")
+  @@map("merchants")
+}
+
+model MerchantAlias {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @map("alias_id") @db.Uuid
+  merchantId      String   @map("merchant_id") @db.Uuid
+  alias           String   @map("alias") @db.VarChar(150)
+  normalizedAlias String   @unique @map("normalized_alias") @db.VarChar(150)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  merchant Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([normalizedAlias], name: "idx_merchant_aliases_normalized")
+  @@map("merchant_aliases")
+}
+
+// ============================================================================
+// SMART CATEGORIZATION — User-Specific Merchant Mappings
+// ============================================================================
+
+model UserMerchantMapping {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @map("mapping_id") @db.Uuid
+  userId                 String   @map("user_id") @db.Uuid
+  merchantId             String?  @map("merchant_id") @db.Uuid
+  merchantName           String   @map("merchant_name") @db.VarChar(150)
+  normalizedMerchantName String   @map("normalized_merchant_name") @db.VarChar(150)
+  counterpartyIdentifier String?  @map("counterparty_identifier") @db.VarChar(255)
+  categoryId             String   @map("category_id") @db.Uuid
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  category Category  @relation("UserMerchantMappingCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, normalizedMerchantName], name: "uq_user_merchant_mapping")
+  @@unique([userId, counterpartyIdentifier], name: "uq_user_counterparty_mapping")
+  @@index([userId, normalizedMerchantName], name: "idx_user_merchant_mappings_user")
+  @@map("user_merchant_mappings")
 }

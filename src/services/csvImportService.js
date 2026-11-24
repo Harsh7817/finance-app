@@ -4,6 +4,7 @@ const csvParser = require('csv-parser');
 const prisma = require('../config/prisma');
 const { normalizeMerchantName } = require('./transactionService');
 const { predictCategory, recordCategorizationLog } = require('./categorizationService');
+const { extractMerchantInfo } = require('./merchantExtractor');
 
 /**
  * Common column name mappings from bank statement CSV formats
@@ -285,6 +286,9 @@ const processCsvImport = async (userId, sourceId, fileBuffer, originalFileName) 
       const cleanMerchant = normalizeMerchantName(rawDesc);
       const extRef = refCol && row[refCol] ? String(row[refCol]).trim() : null;
 
+      // Extract merchant/counterparty info using the smart extractor
+      const extractedInfo = extractMerchantInfo(rawDesc);
+
       // Compute content hash & reference hash for duplicate detection
       const rawContentStr = JSON.stringify(row);
       const contentHash = crypto.createHash('sha256').update(rawContentStr).digest('hex');
@@ -350,7 +354,7 @@ const processCsvImport = async (userId, sourceId, fileBuffer, originalFileName) 
       });
 
       // Intelligently predict category based on rule engine and past corrections
-      const catPrediction = await predictCategory(userId, rawDesc, type);
+      const catPrediction = await predictCategory(userId, rawDesc, type, extractedInfo);
       const categoryId = catPrediction.categoryId;
 
       // Create valid transaction
@@ -368,12 +372,18 @@ const processCsvImport = async (userId, sourceId, fileBuffer, originalFileName) 
           duplicateStatus: 'NOT_DUPLICATE',
           merchantName: String(rawDesc).substring(0, 150),
           cleanMerchantName: cleanMerchant.substring(0, 150),
+          extractedMerchantName: extractedInfo.extractedName.substring(0, 150),
+          counterpartyIdentifier: extractedInfo.counterpartyIdentifier,
           description: String(rawDesc),
           transactionAt: parsedDate,
           postingDate: parsedDate,
           referenceHash: refHash,
           externalReference: extRef,
-          isUserVerified: !catPrediction.isAmbiguous,
+          isUserVerified: catPrediction.categorizationSource === 'USER_MAPPING' || catPrediction.categorizationSource === 'GLOBAL_MERCHANT',
+          categorizationSource: catPrediction.categorizationSource,
+          categorizationStatus: catPrediction.categorizationStatus,
+          confidenceScore: catPrediction.confidenceScore,
+          categorizedAt: new Date(),
         },
       });
 
