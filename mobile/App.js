@@ -287,12 +287,12 @@ export default function App() {
       }
 
       const formData = new FormData();
+      formData.append('sourceId', csvSource.id);
       formData.append('file', {
         uri: file.uri,
         name: fileName,
-        type: file.mimeType || 'text/csv',
+        type: 'text/csv',
       });
-      formData.append('sourceId', csvSource.id);
 
       const importResult = await api.uploadCsv(formData);
 

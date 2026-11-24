@@ -63,8 +63,19 @@ async function apiRequest(endpoint, options = {}) {
     ...(options.headers || {}),
   };
 
-  if (!(options.body instanceof FormData)) {
+  // Accurately detect FormData in React Native / Hermes polyfill environments
+  const isFormData =
+    options.body &&
+    (options.body instanceof FormData ||
+      typeof options.body.append === 'function' ||
+      Boolean(options.body._parts));
+
+  if (!isFormData) {
     headers['Content-Type'] = 'application/json';
+  } else {
+    // CRITICAL for React Native: Never set 'Content-Type' manually on FormData!
+    // Fetch automatically calculates and includes 'multipart/form-data; boundary=...'
+    delete headers['Content-Type'];
   }
 
   if (token) {
@@ -73,8 +84,8 @@ async function apiRequest(endpoint, options = {}) {
 
   const url = `${getApiBaseUrl()}${endpoint}`;
 
-  // Use longer timeout (25s) for file uploads and heavy batch processing, 8s for standard API requests
-  const timeoutMs = options.body instanceof FormData ? 25000 : 8000;
+  // Use generous timeout (60s) for file uploads, 10s for standard requests
+  const timeoutMs = isFormData ? 60000 : 10000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -90,7 +101,7 @@ async function apiRequest(endpoint, options = {}) {
     if (err.name === 'AbortError') {
       throw new Error(`Connection timeout: Could not reach backend server at ${url}.`);
     }
-    throw new Error(`Network error: Could not reach server at ${url}. Check server status or switch to Demo Mode.`);
+    throw new Error(`Network error: ${err.message || 'Could not reach server'} at ${url}.`);
   } finally {
     clearTimeout(timeoutId);
   }
