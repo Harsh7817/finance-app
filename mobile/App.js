@@ -286,13 +286,26 @@ export default function App() {
         fileName = `${fileName}.csv`;
       }
 
+      // Convert local file URI to standard Web Blob for modern Expo SDK 58 / WinterCG fetch compatibility
+      let filePayload;
+      try {
+        const fileRes = await fetch(file.uri);
+        filePayload = await fileRes.blob();
+      } catch {
+        filePayload = {
+          uri: file.uri,
+          name: fileName,
+          type: 'text/csv',
+        };
+      }
+
       const formData = new FormData();
       formData.append('sourceId', csvSource.id);
-      formData.append('file', {
-        uri: file.uri,
-        name: fileName,
-        type: 'text/csv',
-      });
+      if (typeof Blob !== 'undefined' && filePayload instanceof Blob) {
+        formData.append('file', filePayload, fileName);
+      } else {
+        formData.append('file', filePayload);
+      }
 
       const importResult = await api.uploadCsv(formData);
 
